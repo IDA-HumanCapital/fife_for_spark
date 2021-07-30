@@ -105,29 +105,6 @@ def create_example_data2(
         StructField('feature_5', StringType(), True)])
     return sc.createDataFrame(values, schema = schema)
 
-def import_data_file(file_path: str = "Input_Data") -> pyspark.sql.DataFrame:
-    """Return the data stored in given file in given folder."""
-    #This function may run into problems if there are columns with multiple dtypes (strs and ints) together
-    #Also, when StringType columns include NAs (will output: can't merge str and double types together)
-    if file_path.endswith(".avro"):
-        data = sc.read.format('avro').load(file_path)
-    if file_path.endswith(".feather"):
-        data = sc.createDataFrame(pd.read_feather(file_path))
-    elif file_path.endswith(".csv"):
-        data = sc.createDataFrame(pd.read_csv(file_path))
-    elif file_path.endswith(".csv.gz"):
-        data = sc.createDataFrame(pd.read_csv(file_path))
-    elif file_path.endswith((".p", "pkl")):
-        data = sc.createDataFrame(pd.read_pickle(file_path))
-    elif file_path.endswith(".h5"):
-        data = sc.createDataFrame(pd.read_hdf(file_path))
-    elif file_path.endswith(".json"):
-        data = sc.createDataFrame(pd.read_json(file_path))
-    else:
-        raise Exception(
-            "Data file extension is invalid. See README for valid file extensions.")
-    return data
-
 class FIFEArgParser(argparse.ArgumentParser):
     """Argument parser for the FIFE command-line interface."""
 
