@@ -5,14 +5,12 @@ from typing import List, Union
 from warnings import warn
 
 from fifeforspark.base_modelers import default_subset_to_all, Modeler, SurvivalModeler
-
-import findspark
 import pyspark
 import pyspark.sql
-from pyspark.sql import SparkSession, Window
-from pyspark.sql.functions import isnan, lit, col, lag
-from pyspark.sql.types import DateType, TimestampType, StringType, IntegerType, LongType, ShortType, ByteType, FloatType, DoubleType, DecimalType
 import pyspark.sql.functions as F
+from pyspark.sql.types import StructType, StructField, IntegerType, StringType, DoubleType, TimestampType
+from pyspark.ml import Pipeline
+from pyspark.ml.feature import VectorAssembler, StringIndexer
 
 import mmlspark.lightgbm.LightGBMClassifier as lgb
 
@@ -65,20 +63,16 @@ class LGBModeler(Modeler):
             self.n_intervals = n_intervals
         else:
             self.n_intervals = self.set_n_intervals()
-        early_stopping = (params is None) or (
-            any(["num_iterations" not in d for d in params.values()])
-        )
         self.model = self.train(
-            params=params,
-            validation_early_stopping=early_stopping
+            params=params
         )
 
     def train(
         self,
         params: Union[None, dict] = None,
-        subset: Union[None, pd.core.series.Series] = None,
+        subset: Union[None, pyspark.sql.column.Column] = None,
         validation_early_stopping: bool = True,
-    ) -> List[lgb.basic.Booster]:
+    ) -> List[pyspark.ml.pipeline.PipelineModel]:
         """Train a LightGBM model for each lead length."""
         models = []
 
@@ -86,8 +80,7 @@ class LGBModeler(Modeler):
             model = self.train_single_model(
                 time_horizon=time_horizon,
                 params=params,
-                subset=subset,
-                validation_early_stopping=validation_early_stopping,
+                subset=subset
             )
             models.append(model)
 
@@ -97,9 +90,8 @@ class LGBModeler(Modeler):
         self,
         time_horizon: int,
         params: Union[None, dict] = None,
-        subset: Union[None, pd.core.series.Series] = None,
-        validation_early_stopping: bool = True,
-    ) -> lgb.basic.Booster:
+        subset: Union[None, pyspark.sql.column.Column] = None
+    ) -> pyspark.ml.pipeline.PipelineModel:
         """Train a LightGBM model for a single lead length."""
         if params is None:
             params = {
@@ -112,56 +104,33 @@ class LGBModeler(Modeler):
         if subset is None:
             subset = ~self.data[self.test_col] & ~self.data[self.predict_col]
         data = self.label_data(time_horizon)
-        data = data[subset]
+        data = data.filter(subset)
         data = self.subset_for_training_horizon(data, time_horizon)
-        if validation_early_stopping:
-            train_data = lgb.Dataset(
-                data[~data[self.validation_col]][
-                    self.categorical_features + self.numeric_features
-                ],
-                label=data[~data[self.validation_col]]["_label"],
-                weight=data[~data[self.validation_col]][self.weight_col]
-                if self.weight_col
-                else None,
-            )
-            validation_data = train_data.create_valid(
-                data[data[self.validation_col]][
-                    self.categorical_features + self.numeric_features
-                ],
-                label=data[data[self.validation_col]]["_label"],
-                weight=data[data[self.validation_col]][self.weight_col]
-                if self.weight_col
-                else None,
-            )
-            model = lgb.train(
-                params[time_horizon],
-                train_data,
-                early_stopping_rounds=self.config.get("PATIENCE", 4),
-                valid_sets=[validation_data],
-                valid_names=["validation_set"],
-                categorical_feature=self.categorical_features,
-                verbose_eval=True,
-            )
-        else:
-            data = lgb.Dataset(
-                data[self.categorical_features + self.numeric_features],
-                label=data["_label"],
-                weight=data[self.weight_col] if self.weight_col else None,
-            )
-            model = lgb.train(
-                params[time_horizon],
-                data,
-                categorical_feature=self.categorical_features,
-                verbose_eval=True,
-            )
+
+        train_data = data.filter(~data[self.validation_col])[
+                self.categorical_features + self.numeric_features
+            ]
+        indexers = [StringIndexer(inputCol=column, outputCol=column+"_index").fit(data).transform(data)
+                    for column in self.categorical_features]
+        feature_columns = [column + "_index" for column in self.categorical_features] + self.numeric_features
+        assembler = VectorAssembler(inputCols=feature_columns, outputCol='features')
+        lgb_model = LightGBMClassifier(featuresCol="features",
+                                       labelCol="_label",
+                                       *params[time_horizon],
+                                       class_weight=data.filter(~data[self.validation_col])[self.weight_col]
+                                       if self.weight_col
+                                       else None
+                                       )
+        pipeline = Pipeline(stages=[*indexers, assembler, lgb_model])
+        model = pipeline.fit(train_data)
         return model
 
     def predict(
-        self, subset: Union[None, pd.core.series.Series] = None, cumulative: bool = True
+        self, subset: Union[None, pyspark.sql.column.Column] = None, cumulative: bool = True
     ) -> np.ndarray:
         """Use trained LightGBM models to predict the outcome for each observation and time horizon.
         Args:
-            subset: A Boolean Series that is True for observations for which
+            subset: A Boolean Spark Column that is True for observations for which
                 predictions will be produced. If None, default to all
                 observations.
             cumulative: If True, produce cumulative survival probabilies.
@@ -172,12 +141,12 @@ class LGBModeler(Modeler):
             length.
         """
         subset = default_subset_to_all(subset, self.data)
-        predict_data = self.data[self.categorical_features + self.numeric_features][
-            subset
-        ]
+        predict_data = self.data.filter(subset)[self.categorical_features + self.numeric_features]
+
+        # This is a single node version of this. Eventually we may want to distribute the array
         predictions = np.array(
             [
-                lead_specific_model.predict(predict_data)
+                [x[0][0] for x in list(lead_specific_model.transform(predict_data).select('probability').collect())]
                 for lead_specific_model in self.model
             ]
         ).T
@@ -188,32 +157,14 @@ class LGBModeler(Modeler):
     def transform_features(self) -> pd.DataFrame:
         """Transform features to suit model training."""
         data = self.data.copy(deep=True)
-        if self.config.get("DATETIME_AS_DATE", True):
-            date_cols = list(data.select_dtypes("datetime").columns) + [
-                col
-                for col in data.select_dtypes("category")
-                if np.issubdtype(data[col].cat.categories.dtype, np.datetime64)
-            ]
-            for col in date_cols:
-                data[col] = (
-                    data[col].dt.year * 10000
-                    + data[col].dt.month * 100
-                    + data[col].dt.day
-                )
-        else:
-            data[data.select_dtypes("datetime").columns] = data[
-                data.select_dtypes("datetime").columns
-            ].apply(pd.to_numeric)
-            for col in data.select_dtypes("category"):
-                if np.issubdtype(data[col].cat.categories.dtype, np.datetime64):
-                    data[col] = data[col].astype(int)
+        # TODO: ADD FUNCTIONALItY
         return data
 
     def save_model(self, file_name: str = "GBT_Model", path: str = "") -> None:
-        """Save the horizon-specific LightGBM models that comprise the model to disk."""
-        for i, lead_specific_model in enumerate(self.model):
-            with open(f"{path}{i + 1}-lead_{file_name}.json", "w") as file:
-                json.dump(lead_specific_model.dump_model(), file, indent=4)
+        """Save the horizon-specific LightGBM models that comprise the model to disk.
+        Functionality does not currently exist
+        """
+        pass
 
 
 class LGBSurvivalModeler(LGBModeler, SurvivalModeler):
