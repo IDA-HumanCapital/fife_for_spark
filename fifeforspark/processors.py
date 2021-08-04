@@ -7,11 +7,10 @@ from pyspark.sql.functions import isnan, lit, col, lag
 from pyspark.sql.types import DateType, TimestampType, StringType, IntegerType, LongType, ShortType, ByteType, FloatType, DoubleType, DecimalType
 import pyspark.sql.functions as F
 
-findspark.init()
-sc = SparkSession.builder.getOrCreate()
-
 class DataProcessor:
     def __init__(self, config = {}, spark_df = None) -> None:
+        findspark.init()
+        self.sc = SparkSession.builder.getOrCreate()
         if (config.get("individual_identifier", "") == "") and spark_df is not None:
             config["individual_identifier"] = spark_df.columns[0]
         self.config  = config

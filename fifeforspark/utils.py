@@ -1,18 +1,17 @@
 from pyspark.sql import SparkSession
 import pandas as pd
 import findspark
-import pyspark.sql
 from pyspark.mllib.random import RandomRDDs
 import numpy as np
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, FloatType
 import random as rn
 import argparse
 
-findspark.init()
-sc = SparkSession.builder.getOrCreate()
 
 def create_example_data1(n_persons: int = 3, n_periods: int = 12
 ) -> pd.core.frame.DataFrame:
+    findspark.init()
+    sc = SparkSession.builder.getOrCreate()
     schema = StructType([
         StructField('individual', StringType(), True),
         StructField('period', StringType(), True),
@@ -58,6 +57,8 @@ def create_example_data2(
     n_persons: int = 8192, n_periods: int = 20
 ) -> pd.core.frame.DataFrame:
     """Fabricate an unbalanced panel dataset suitable as FIFE input."""
+    findspark.init()
+    sc = SparkSession.builder.getOrCreate()
     seed = 9999
     np.random.seed(seed)
     values = []
