@@ -114,7 +114,7 @@ class LGBModeler(Modeler):
                     for column in self.categorical_features]
         feature_columns = [column + "_index" for column in self.categorical_features] + self.numeric_features
         assembler = VectorAssembler(inputCols=feature_columns, outputCol='features')
-        lgb_model = LightGBMClassifier(featuresCol="features",
+        lgb_model = lgb(featuresCol="features",
                                        labelCol="_label",
                                        *params[time_horizon],
                                        class_weight=data.filter(~data[self.validation_col])[self.weight_col]
