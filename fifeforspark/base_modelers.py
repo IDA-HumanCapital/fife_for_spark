@@ -143,7 +143,73 @@ class Modeler(ABC):
         return n_intervals
 
 class SurvivalModeler(Modeler):
-    pass
+    """Forecast probabilities of being observed in future periods.
+    
+    Attributes:
+        config (dict): User-provided configuration parameters.
+        data (pd.core.frame.DataFrame): User-provided panel data.
+        categorical_features (list): Column names of categorical features.
+        duration_col (str): Name of the column representing the number of
+            future periods observed for the given individual.
+        event_col (str): Name of the column indicating whether the individual
+            is observed to exit the dataset.
+        predict_col (str): Name of the column indicating whether the
+            observation will be used for prediction after training.
+        test_col (str): Name of the column indicating whether the observation
+            will be used for testing model performance after training.
+        validation_col (str): Name of the column indicating whether the
+            observation will be used for evaluating model performance during
+            training.
+        period_col (str): Name of the column representing the number of
+            periods since the earliest period in the data.
+        max_lead_col (str): Name of the column representing the number of
+            observable future periods.
+        spell_col (str): Name of the column representing the number of
+            previous spells of consecutive observations of the same individual.
+        weight_col (str): Name of the column representing observation weights.
+        reserved_cols (list): Column names of non-features.
+        numeric_features (list): Column names of numeric features.
+        n_intervals (int): The largest number of periods ahead to forecast.
+        allow_gaps (bool): Whether or not observations should be included for
+            training and evaluation if there is a period without an observation
+            between the period of observations and the last period of the
+            given time horizon.
+    """
+    def __init__(self, **kwargs):
+        """Initialize the SurvivalModeler.
+        Args:
+            **kwargs: Arguments to Modeler.__init__().
+        """
+        super().__init__(**kwargs)
+        self.objective = "binary"
+        self.num_class = 1
+    
+    def forecast(spark_df: pyspark.sql.DataFrane, columns, allow_gaps: bool) -> pyspark.sql.DataFrame:
+        columns = [str(i + 1) + "-period Survival Probability" for i in range(self.n_intervals)]
+        forecasts.columns = columns
+        return forecasts
+    
+    def subset_for_training_horizon(self, data: pyspark.sql.DataFrame, time_horizon: int) -> pyspark.sql.DataFrame:
+        """Return only observations where survival would be observed."""
+        if self.allow_gaps:
+            return data.select(data[self.max_lead_col] > lit(time_horizon))
+        return data.select((data[self.duration_col] + data[self.event_col]).cast('int') > lit(time_horizon))
+    
+    def label_data(self, time_horizon: int) -> pyspark.sql.DataFrame:
+        """Return data with an indicator for survival for each observation."""
+        #Spark automatically creates a copy when setting one value equal to another, different from python
+        spark_df = self.data
+        #Find the row-wise minimums of duration and max_lead: spark_df[self.duration_col] = data[[self.duration_col, self.max_lead_col]].min(axis=1)
+        spark_df = spark_df.withColumn(self.duration_col, when(self.duration_col <= self.max_lead_col, self.duration_col).otherwise(self.max_lead_col))
+        if self.allow_gaps:
+            ids = spark_df[self.config["INDIVIDUAL_IDENTIFIER"], self.config["TIME_IDENTIFIER"]]
+            #Time horizon is pre-specified
+            ids.withColumn(self.config["TIME_IDENTIFIER"], ids[self.config["TIME_IDENTIFIER"]] - time_horizon - 1)
+            ids.withColumn('_label', lit(True))
+            spark_df = spark_df.join(ids,(spark_df[self.config["INDIVIDUAL_IDENTIFIER"]] == ids[self.config["INDIVIDUAL_IDENTIFIER"]]) & (spark_df[self.config["TIME_IDENTIFIER"]] == ids[self.config["TIME_IDENTIFIER"]]),"left")
+            spark_df.withColumn('_label', spark_df.fillna(False, subset = ['_label']))
+        else:
+            spark_df.withColumn('_label', soark_df[self.duration_col] > lit(time_horizon)
 
 class StateModeler(Modeler):
     pass
