@@ -5,6 +5,7 @@ from pyspark.sql import SparkSession, Window
 from pyspark.sql.functions import isnan, lit, col, lag
 from pyspark.sql.types import DateType, TimestampType, StringType, IntegerType, LongType, ShortType, ByteType, FloatType, DoubleType, DecimalType
 import pyspark.sql.functions as F
+import databricks.koalas as ks
 
 class DataProcessor:
     def __init__(self, config = {}, data = None) -> None:
@@ -17,7 +18,7 @@ class DataProcessor:
 
     def check_column_consistency(self, colname: str) -> None:
         """Assert column exists, has no missing values, and is not constant."""
-        assert colname in self.spark_df.columns, f"{colname} not in data"
+        assert colname in self.data.columns, f"{colname} not in data"
         assert self.data.select(isnan(colname).cast('int').alias(colname)).agg({colname:'sum'}).first()[0] == 0, f"{colname} has missing values"
         assert self.data.select(colname).distinct().count() >= 2, f"{colname} does not have multiple unique values"
     
@@ -41,7 +42,9 @@ class DataProcessor:
             if col.endswith(self.config.get('numerical_suffixes', ())):
                 print(f"{col} matches numeric suffix but is non-numeric; identified as categorical")
             return True
-        if (col.endswith(self.config.get('numerical_suffixes', ()))) or (self.spark_df.select(col).distinct().count() > self.config.get('max_unique_categories', 1024)):
+        if isinstance(self.data.schema[col].dataType, (IntegerType, LongType, ShortType, ByteType, FloatType, DoubleType, DecimalType)):
+            return False
+        if (col.endswith(self.config.get('numerical_suffixes', ()))) or (self.data.select(col).distinct().count() > self.config.get('max_unique_categories', 1024)):
             return False
         return True
     
@@ -67,7 +70,7 @@ class PanelDataProcessor(DataProcessor):
         elif self.is_categorical(colname):
             self.data = self.data.withColumn(colname, self.data[colname].cast(StringType()))
             self.data = self.data.fillna('NaN', subset = [colname])
-        return self.spark_df
+        return self.data
 
     def process_all_columns(self, indiv_id: str = None) -> pyspark.sql.DataFrame:
         """Apply data cleaning functions to all data columns."""
@@ -87,7 +90,11 @@ class PanelDataProcessor(DataProcessor):
 
     def build_reserved_cols(self):
         """Add data split and outcome-related columns to the data."""
-        self.data = self.data.withColumn('_period', self.data[self.config['time_identifier']] - 1)
+        #self.data = self.data.withColumn('_period', self.data[self.config['time_identifier']] - 1)
+        ks_df = ks.DataFrame(self.data)
+        ks_df['_period'] = ks_df[self.config['time_identifier']].factorize(sort = True)[0]
+        self.data = ks_df.to_spark()
+        
         max_val = lit(self.data.agg({'_period' : 'max'}).first()[0])
         self.data = self.data.withColumn('_period_obs', self.data['_period'] == max_val)
 
@@ -99,7 +106,7 @@ class PanelDataProcessor(DataProcessor):
 
         self.data = self.flag_validation_individuals(self.data, self.config['individual_identifier'])
         self.data = self.data.withColumn('_validation', ~self.data['_test'] & self.data['val_flagged'])
-
+        
         obs_max_window = Window.partitionBy('_test').orderBy(col("_period").desc())
         self.data = self.data.withColumn('obs_max_period', F.max(self.data['_period']).over(obs_max_window))
         self.data = self.data.withColumn('_maximum_lead', self.data.obs_max_period - self.data['_period'] + (self.data.obs_max_period < max_val).cast('int'))
@@ -133,6 +140,7 @@ class PanelDataProcessor(DataProcessor):
         self.data.cache()
         self.check_panel_consistency()
         self.data = self.process_all_columns()
+        print(self.data.dtypes)
         self.data = self.build_reserved_cols()
         self.data = self.sort_panel_data()
         return self.data
