@@ -140,7 +140,6 @@ class PanelDataProcessor(DataProcessor):
         self.data.cache()
         self.check_panel_consistency()
         self.data = self.process_all_columns()
-        print(self.data.dtypes)
         self.data = self.build_reserved_cols()
         self.data = self.sort_panel_data()
         return self.data
