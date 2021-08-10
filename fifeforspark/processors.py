@@ -1,32 +1,51 @@
 import findspark
 import pyspark
 import pyspark.sql
-from pyspark.sql import SparkSession
-from pyspark.sql import Window
+import pyspark.sql.functions as F
+import databricks.koalas as ks
+from pyspark.sql import SparkSession, Window
 from pyspark.sql.functions import isnan, lit, col, lag
 from pyspark.sql.types import DateType, TimestampType, StringType, IntegerType, LongType, ShortType, ByteType, FloatType, DoubleType, DecimalType
-import pyspark.sql.functions as F
+from typing import Union
+from warnings import warn
+
 
 class DataProcessor:
-    def __init__(self, config = {}, spark_df = None) -> None:
+    """Prepare data by identifying features as degenerate or categorical."""
+
+    def __init__(self, config={}, data=None) -> None:
+        """Initialize the DataProcessor.
+        Args:
+            config: A dictionary of configuration parameters.
+            data: A DataFrame to be processed.
+        """
         findspark.init()
-        self.sc = SparkSession.builder.getOrCreate()
-        if (config.get("individual_identifier", "") == "") and spark_df is not None:
-            config["individual_identifier"] = spark_df.columns[0]
-        self.config  = config
-        self.spark_df = spark_df
+        self.spark = SparkSession.builder.getOrCreate()
+        if (config.get("individual_identifier", "") == "") and data is not None:
+            config["individual_identifier"] = data.columns[0]
+            print(
+                "Individual identifier column name not given; assumed to be "
+                f'leftmost column ({config["individual_identifier"]})'
+            )
+        self.config = config
+        self.data = data
 
     def check_column_consistency(self, colname: str) -> None:
         """Assert column exists, has no missing values, and is not constant."""
-        assert colname in self.spark_df.columns, f"{colname} not in data"
-        assert self.spark_df.select(isnan(colname).cast('int').alias(colname)).agg({colname:'sum'}).first()[0] == 0, f"{colname} has missing values"
-        assert self.spark_df.select(colname).distinct().count() >= 2, f"{colname} does not have multiple unique values"
-    
-    def is_degenerate(self , col: str) -> bool:
+        assert colname in self.data.columns, f"{colname} not in data"
+        assert self.data.select(
+            isnan(colname).cast('int').alias(colname)
+        ).agg({colname: 'sum'}).first()[0] == 0, f"{colname} has missing values"
+        assert self.data.select(
+            colname).distinct().count() >= 2, f"{colname} does not have multiple unique values"
+
+    def is_degenerate(self, col: str) -> bool:
         """Determine if a feature is constant or has too many missing values."""
-        if self.spark_df.select(isnan(col).cast('integer').alias(col)).agg({col:'mean'}).first()[0] >= self.config.get('max_null_share', 0.999):
+        if self.data.select(
+                isnan(col).cast('integer').alias(col)
+        ).agg({col: 'mean'}).first()[0] >= self.config.get('max_null_share', 0.999):
             return True
-        if self.spark_df.select(col).distinct().count() < 2:
+        if self.data.select(col).distinct().count() < 2:
             return True
         return False
 
@@ -34,106 +53,177 @@ class DataProcessor:
         """Determine if the given feature should be processed as categorical, as opposed to numeric."""
         if col.endswith(self.config.get('categorical_suffixes', ())):
             if col.endswith(self.config.get('numerical_suffixes', ())):
-                print(f"{col} matches both categorical and numerical suffixes; it will be identified as categorical")
+                print(
+                    f"{col} matches both categorical and numerical suffixes; it will be identified as categorical"
+                )
             return True
-        if isinstance(self.spark_df.schema[col].dataType, (DateType, TimestampType)):
+        if isinstance(self.data.schema[col].dataType, (DateType, TimestampType)):
             return False
-        if not isinstance(self.spark_df.schema[col].dataType, (IntegerType, LongType, ShortType, ByteType, FloatType, DoubleType, DecimalType)):
+        if not isinstance(self.data.schema[col].dataType, (IntegerType, LongType, ShortType,
+                                                           ByteType, FloatType, DoubleType, DecimalType)):
             if col.endswith(self.config.get('numerical_suffixes', ())):
-                print(f"{col} matches numeric suffix but is non-numeric; identified as categorical")
+                print(
+                    f"{col} matches numeric suffix but is non-numeric; identified as categorical"
+                )
             return True
-        if (col.endswith(self.config.get('numerical_suffixes', ()))) or (self.spark_df.select(col).distinct().count() > self.config.get('max_unique_categories', 1024)):
+        if isinstance(self.data.schema[col].dataType, (IntegerType, LongType, ShortType,
+                                                       ByteType, FloatType, DoubleType, DecimalType)):
+            return False
+        if (col.endswith(self.config.get('numerical_suffixes', ()))) or (
+                self.data.select(col).distinct().count() > self.config.get('max_unique_categories', 1024)):
             return False
         return True
-    
+
+
 class PanelDataProcessor(DataProcessor):
-    def __init__(self, config, spark_df) -> None:
-        if (config.get("time_identifier", "") == "") and spark_df is not None:
-            config["time_identifier"] = spark_df.columns[1]
-        super().__init__(config, spark_df)
-        
+    """Ready panel data for modelling.
+
+    Attributes:
+        config (dict): User-provided configuration parameters.
+        data (pd.core.frame.DataFrame): Processed panel data.
+        raw_subset (pd.core.frame.DataFrame): An unprocessed sample from the
+            final period of data. Useful for displaying meaningful values in
+            SHAP plots.
+        categorical_maps (dict): Contains for each categorical feature a map
+            from each unique value to a whole number.
+        numeric_ranges (pd.core.frame.DataFrame): Contains for each numeric
+            feature the maximum and minimum value in the training set.
+    """
+
+    def __init__(self, config: Union[None, dict] = {},
+                 data: Union[None, pyspark.sql.DataFrame] = None,) -> None:
+        """Initialize the PanelDataProcessor.
+        Args:
+            config: A dictionary of configuration parameters.
+            data: A DataFrame to be processed.
+        """
+
+        if (config.get("time_identifier", "") == "") and data is not None:
+            config["time_identifier"] = data.columns[1]
+            print(
+                "Time identifier column name not given; assumed to be "
+                f'second-leftmost column ({config["time_identifier"]})'
+            )
+        super().__init__(config, data)
+
     def check_panel_consistency(self) -> None:
         """Ensure observations have unique individual-period combinations."""
         self.check_column_consistency(self.config['individual_identifier'])
         self.check_column_consistency(self.config['time_identifier'])
-        subset = self.spark_df.select([self.config['individual_identifier'], self.config['time_identifier']])
-        assert subset.count() == subset.dropDuplicates().count(), "One or more individuals have multiple observations for a single time value"
+        subset = self.data.select(
+            [self.config['individual_identifier'], self.config['time_identifier']])
+        assert subset.count() == subset.dropDuplicates().count(
+        ), "One or more individuals have multiple observations for a single time value."
 
-    def process_single_columns(self, colname):
+    def process_single_column(self, colname):
         """Apply data cleaning functions to a singular data column."""
         if colname == self.config['individual_identifier']:
-            return self.spark_df
-        if self.is_degenerate(col = colname):
-            self.spark_df = self.spark_df.drop(colname)
+            return self.data
+        if self.is_degenerate(col=colname):
+            self.data = self.data.drop(colname)
         elif self.is_categorical(colname):
-            self.spark_df = self.spark_df.withColumn(colname, self.spark_df[colname].cast(StringType()))
-            self.spark_df = self.spark_df.fillna('NaN', subset = [colname])
-        return self.spark_df
+            self.data = self.data.withColumn(
+                colname, self.data[colname].cast(StringType()))
+            self.data = self.data.fillna('NaN', subset=[colname])
+        return self.data
 
     def process_all_columns(self, indiv_id: str = None) -> pyspark.sql.DataFrame:
         """Apply data cleaning functions to all data columns."""
-        for col_name in self.spark_df.columns:
-            self.spark_df = self.process_single_columns(colname = col_name)
-        return self.spark_df
+        for col_name in self.data.columns:
+            self.data = self.process_single_column(colname=col_name)
+        return self.data
 
-    def flag_validation_individuals(self, individual_identifier: 'str', validation_share: float = 0.25) -> pyspark.sql.DataFrame:
+    def flag_validation_individuals(
+            self, individual_identifier: 'str', validation_share: float = 0.25
+    ) -> pyspark.sql.DataFrame:
         """Flag observations from a random share of individuals."""
-        unique_ids = self.spark_df.select(self.config['individual_identifier']).distinct()
+        unique_ids = self.data.select(
+            self.config['individual_identifier']).distinct()
         total = unique_ids.count()
         val_size = int(self.config.get('validation_share', 0.25) * total)
-        unique_ids = unique_ids.sample(True,val_size/total , seed = 9999)
-        unique_list = list(unique_ids.select(self.config['individual_identifier']).toPandas()[self.config['individual_identifier']])
-        self.spark_df = self.spark_df.withColumn('val_flagged', self.spark_df[self.config['individual_identifier']].isin(unique_list))
-        return self.spark_df
+        unique_ids = unique_ids.sample(True, val_size/total, seed=9999)
+        unique_list = list(
+            unique_ids.select(self.config['individual_identifier']
+                              ).toPandas()[self.config['individual_identifier']])
+        self.data = self.data.withColumn(
+            'val_flagged', self.data[self.config['individual_identifier']].isin(unique_list))
+        return self.data
 
     def build_reserved_cols(self):
         """Add data split and outcome-related columns to the data."""
-        self.spark_df = self.spark_df.withColumn('_period', self.spark_df[self.config['time_identifier']] - 1)
-        max_val = lit(self.spark_df.agg({'_period' : 'max'}).first()[0])
-        self.spark_df = self.spark_df.withColumn('_period_obs', self.spark_df['_period'] == max_val)
+        ks_df = ks.DataFrame(self.data)
+        ks_df['_period'] = ks_df[self.config['time_identifier']].factorize(sort=True)[
+            0]
+        self.data = ks_df.to_spark()
 
-        max_test_intervals = int((self.spark_df.select('_period').distinct().count() - 1) / 2)
+        max_val = lit(self.data.agg({'_period': 'max'}).first()[0])
+        self.data = self.data.withColumn(
+            '_period_obs', self.data['_period'] == max_val)
+
+        max_test_intervals = int(
+            (self.data.select('_period').distinct().count() - 1) / 2)
         if self.config.get('test_intervals', 0) > max_test_intervals:
+            warn(
+                f"The specified value for TEST_INTERVALS was too high and will not allow for enough training periods. It was automatically reduced to {max_test_intervals}"
+            )
             self.config['test_intervals'] = max_test_intervals
 
-        self.spark_df = self.spark_df.withColumn('_test', (self.spark_df['_period'] + self.config.get('test_intervals', 0)) >= max_val)
+        self.data = self.data.withColumn(
+            '_test', (self.data['_period'] + self.config.get('test_intervals', 0)) >= max_val)
 
-        self.spark_df = self.flag_validation_individuals(self.spark_df, self.config['individual_identifier'])
-        self.spark_df = self.spark_df.withColumn('_validation', ~self.spark_df['_test'] & self.spark_df['val_flagged'])
+        self.data = self.flag_validation_individuals(
+            self.data, self.config['individual_identifier'])
+        self.data = self.data.withColumn(
+            '_validation', ~self.data['_test'] & self.data['val_flagged'])
 
-        obs_max_window = Window.partitionBy('_test').orderBy(col("_period").desc())
-        self.spark_df = self.spark_df.withColumn('obs_max_period', F.max(self.spark_df['_period']).over(obs_max_window))
-        self.spark_df = self.spark_df.withColumn('_maximum_lead', self.spark_df.obs_max_period - self.spark_df['_period'] + (self.spark_df.obs_max_period < max_val).cast('int'))
+        obs_max_window = Window.partitionBy(
+            '_test').orderBy(col("_period").desc())
+        self.data = self.data.withColumn('obs_max_period', F.max(
+            self.data['_period']).over(obs_max_window))
+        self.data = self.data.withColumn(
+            '_maximum_lead', self.data.obs_max_period - self.data['_period'] + (
+                self.data.obs_max_period < max_val).cast('int'))
 
-        period_window = Window.partitionBy(self.config['individual_identifier']).orderBy('_period')
-        self.spark_df = self.spark_df.withColumn("prev_period", lag(self.spark_df['_period']).over(period_window))
-        self.spark_df = self.spark_df.withColumn("gaps", self.spark_df.prev_period < (self.spark_df['_period'] - 1)).fillna(False)
-        self.spark_df = self.spark_df.withColumn("gaps", self.spark_df.gaps.cast('int'))
-        self.spark_df = self.spark_df.withColumn("_spell", F.sum(self.spark_df.gaps).over(period_window))
+        period_window = Window.partitionBy(
+            self.config['individual_identifier']).orderBy('_period')
+        self.data = self.data.withColumn("prev_period", lag(
+            self.data['_period']).over(period_window))
+        self.data = self.data.withColumn(
+            "gaps", self.data.prev_period < (self.data['_period'] - 1)).fillna(False)
+        self.data = self.data.withColumn("gaps", self.data.gaps.cast('int'))
+        self.data = self.data.withColumn(
+            "_spell", F.sum(self.data.gaps).over(period_window))
 
-        duration_window = Window.partitionBy([self.config['individual_identifier'], '_spell']).orderBy("_period")
-        self.spark_df = self.spark_df.withColumn('_duration', F.count(self.spark_df['_spell']).over(duration_window))
-        max_duration_window = Window.partitionBy([self.config['individual_identifier'], '_spell']).orderBy(col("_period").desc())
-        self.spark_df = self.spark_df.withColumn('max_duration', F.max(self.spark_df['_duration']).over(max_duration_window))
-        self.spark_df = self.spark_df.withColumn('_duration', self.spark_df.max_duration - self.spark_df['_duration'])
-        self.spark_df = self.spark_df.withColumn('_event_observed', self.spark_df['_duration'] < self.spark_df['_maximum_lead'])
+        duration_window = Window.partitionBy(
+            [self.config['individual_identifier'], '_spell']).orderBy("_period")
+        self.data = self.data.withColumn('_duration', F.count(
+            self.data['_spell']).over(duration_window))
 
-        self.spark_df = self.spark_df.drop('max_duration')
-        self.spark_df = self.spark_df.drop('prev_period')
-        self.spark_df = self.spark_df.drop('gaps')
-        self.spark_df = self.spark_df.drop('val_flagged')
-        self.spark_df = self.spark_df.drop('Obs_max_period')
-        return(self.spark_df)
+        max_duration_window = Window.partitionBy(
+            [self.config['individual_identifier'], '_spell']).orderBy(col("_period").desc())
+        self.data = self.data.withColumn('max_duration', F.max(
+            self.data['_duration']).over(max_duration_window))
+        self.data = self.data.withColumn(
+            '_duration', self.data.max_duration - self.data['_duration'])
+        self.data = self.data.withColumn(
+            '_event_observed', self.data['_duration'] < self.data['_maximum_lead'])
+
+        self.data = self.data.drop('max_duration')
+        self.data = self.data.drop('prev_period')
+        self.data = self.data.drop('gaps')
+        self.data = self.data.drop('val_flagged')
+        self.data = self.data.drop('Obs_max_period')
+        return(self.data)
 
     def sort_panel_data(self) -> pyspark.sql.DataFrame:
         """Sort the data by individual, then by period."""
-        return(self.spark_df.orderBy(F.asc(self.config['individual_identifier']), F.asc('_period')))
+        return(self.data.orderBy(F.asc(self.config['individual_identifier']), F.asc('_period')))
 
     def build_processed_data(self):
         """Clean, augment, and store a panel dataset and related information."""
-        self.spark_df.cache()
+        self.data.cache()
         self.check_panel_consistency()
-        self.spark_df = self.process_all_columns()
-        self.spark_df = self.build_reserved_cols()
-        self.spark_df = self.sort_panel_data()
-        return self.spark_df
+        self.data = self.process_all_columns()
+        self.data = self.build_reserved_cols()
+        self.data = self.sort_panel_data()
+        return self.data
