@@ -25,7 +25,7 @@ class DataProcessor:
             config["individual_identifier"] = data.columns[0]
             print(
                 "Individual identifier column name not given; assumed to be "
-                f'leftmost column ({config["INDIVIDUAL_IDENTIFIER"]})'
+                f'leftmost column ({config["individual_identifier"]})'
             )
         self.config = config
         self.data = data
@@ -102,7 +102,7 @@ class PanelDataProcessor(DataProcessor):
             config["time_identifier"] = data.columns[1]
             print(
                 "Time identifier column name not given; assumed to be "
-                f'second-leftmost column ({config["TIME_IDENTIFIER"]})'
+                f'second-leftmost column ({config["time_identifier"]})'
             )
         super().__init__(config, data)
 
