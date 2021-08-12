@@ -9,6 +9,8 @@ import numpy as np
 from abc import ABC
 from pyspark.mllib.tree import GradientBoostedTrees, GradientBoostedTreesModel
 from pyspark.mllib.util import MLUtils
+from typing import Union
+import databricks.koalas as ks
 
 class Modeler(ABC):
     """Set template for modelers that use panel data to produce forecasts.
@@ -183,6 +185,78 @@ class SurvivalModeler(Modeler):
         super().__init__(**kwargs)
         self.objective = "binary"
         self.num_class = 1
+        
+    def evaluate(
+        self,
+        subset: Union[None, pyspark.sql.column.Column] = None,
+        threshold_positive: Union[None, str, float] = 0.5,
+        share_positive: Union[None, str, float] = None,
+    ) -> ks.frame.DataFrame:
+        """Tabulate model performance metrics.
+        Args:
+            subset: A Boolean Series that is True for observations over which
+                the metrics will be computed. If None, default to all test
+                observations in the earliest period of the test set.
+            threshold_positive: None, "predicted", or a value in [0, 1]
+                representing the minimum predicted probability considered to be a
+                positive prediction; Specify "predicted" to use the predicted share
+                positive in each time horizon. Overridden by share_positive.
+            share_positive: None, "predicted", or a value in [0, 1] representing
+                the share of observations with the highest predicted probabilities
+                considered to have positive predictions. Specify "predicted" to use
+                the predicted share positive in each time horizon. Probability ties
+                may cause share of positives in output to exceed given value.
+                Overrides threshold_positive.
+        Returns:
+            A DataFrame containing, for the binary outcomes of survival to each
+            lead length, area under the receiver operating characteristic
+            curve (AUROC), predicted and actual shares of observations with an
+            outcome of True, and all elements of the confusion matrix. Also
+            includes concordance index over the restricted mean survival time.
+        """
+    filtered = self.data.filter(self.data[self.test_col])
+    min_val = filtered.select(self.data[self.period_col]).agg({self.period_col:'min'}).first()[0]
+    if subset is None:
+        subset = self.data[self.test_col] & self.data.select(self.data[self.period_col] == lit(min_val))
+    predictions = self.predict(subset=subset, cumulative=(not self.allow_gaps))
+    schema = StructType([
+                StructField('AUROC', FloatType(), True),
+                StructField('Predicted Share', FloatType(), True),
+                StructField('Actual Share', FloatType(), True),
+                StructField('True Positives', IntegerType(), True),
+                StructField('False Negatives', IntegerType(), True),
+                StructField('False Positives', IntegerType(), True),
+                StructField('True Negatives', IntegerType(), True)])
+    metrics = sc.createDataFrame(spark.sparkContext.emptyRDD, schema = schema)
+
+    lead_lengths = np.arange(self.n_intervals) + 1
+
+    for lead_length in lead_lengths:
+        actuals = self.label_data(lead_length - 1).filter(subset)
+        actuals = actuals.filter(actuals[self.max_lead_col] >= lit(lead_length))
+        weights = actuals.select(actuals[self.weight_col]) if self.weight_col in self.data.columns else None
+        actuals = actuals.select(actuals["_label"])
+        metrics.union(
+            compute_metrics_for_binary_outcome(
+                actuals,
+                predictions[:, lead_length - 1][actuals.index],
+                threshold_positive=threshold_positive,
+                share_positive=share_positive,
+                weights=weights,
+            )
+        )
+    #Pyspark dataframes don't have an index
+    #Pyspark doesn't have built-in concordance_index
+    #Maybe we can use koalas here? I believe it'll solve both problems, but at the cost of some performance
+    metrics = metrics.to_koalas
+    metrics['Lead Length'] = lead_lengths
+    metrics.set_index('Lead Length')
+    metrics["Other Metrics:"] = ""
+    metrics["C-Index"] = np.where(
+            metrics.index == 1, concordance_index_value, ""
+        )
+    metrics = metrics.dropna()
+    return metrics
     
     def forecast(spark_df: pyspark.sql.DataFrane, columns, allow_gaps: bool) -> pyspark.sql.DataFrame:
         columns = [str(i + 1) + "-period Survival Probability" for i in range(self.n_intervals)]
@@ -195,21 +269,23 @@ class SurvivalModeler(Modeler):
             return data.select(data[self.max_lead_col] > lit(time_horizon))
         return data.select((data[self.duration_col] + data[self.event_col]).cast('int') > lit(time_horizon))
     
-    def label_data(self, time_horizon: int) -> pyspark.sql.DataFrame:
+    def label_data(self, time_horizon: int, duration_col: str, max_lead_col: str) -> pyspark.sql.DataFrame:
         """Return data with an indicator for survival for each observation."""
         #Spark automatically creates a copy when setting one value equal to another, different from python
-        spark_df = self.data
-        #Find the row-wise minimums of duration and max_lead: spark_df[self.duration_col] = data[[self.duration_col, self.max_lead_col]].min(axis=1)
-        spark_df = spark_df.withColumn(self.duration_col, when(self.duration_col <= self.max_lead_col, self.duration_col).otherwise(self.max_lead_col))
+        spark_df = self
+        spark_df = spark_df.withColumn(duration_col, when(duration_col <= max_lead_col, duration_col).otherwise(max_lead_col))
         if self.allow_gaps:
             ids = spark_df[self.config["INDIVIDUAL_IDENTIFIER"], self.config["TIME_IDENTIFIER"]]
-            #Time horizon is pre-specified
-            ids.withColumn(self.config["TIME_IDENTIFIER"], ids[self.config["TIME_IDENTIFIER"]] - time_horizon - 1)
-            ids.withColumn('_label', lit(True))
+            ids = ids.withColumn(self.config["INDIVIDUAL_IDENTIFIER"] + '_new', ids[self.config["INDIVIDUAL_IDENTIFIER"]])
+            ids = ids.withColumn(self.config["TIME_IDENTIFIER"] + '_new', ids[self.config["TIME_IDENTIFIER"]] - time_horizon - 1)
+            ids = ids.withColumn('_label', lit(True))
+            ids = ids.drop(self.config["INDIVIDUAL_IDENTIFIER"], self.config["TIME_IDENTIFIER"])
+            
             spark_df = spark_df.join(ids,(spark_df[self.config["INDIVIDUAL_IDENTIFIER"]] == ids[self.config["INDIVIDUAL_IDENTIFIER"]]) & (spark_df[self.config["TIME_IDENTIFIER"]] == ids[self.config["TIME_IDENTIFIER"]]),"left")
-            spark_df.withColumn('_label', spark_df.fillna(False, subset = ['_label']))
+            spark_df = spark_df.drop(self.config["INDIVIDUAL_IDENTIFIER"] + '_new', self.config["TIME_IDENTIFIER"] + '_new')
+            spark_df = spark_df.fillna(False, subset = ['_label'])
         else:
-            spark_df.withColumn('_label', soark_df[self.duration_col] > lit(time_horizon)
+            spark_df.withColumn('_label', spark_df[self.duration_col] > lit(time_horizon))
 
 class StateModeler(Modeler):
     pass
