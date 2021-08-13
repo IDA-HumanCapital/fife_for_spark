@@ -1,16 +1,80 @@
-from pyspark.sql import SparkSession
+from pyspark.sql import SparkSession, Window
 from pyspark.sql.functions import lit, when
 import findspark
 import pyspark
-from pyspark.ml.evaluation import MulticlassClassificationEvaluator
+from pyspark.mllib.evaluation import BinaryClassificationMetrics
 from pyspark.sql.types import *
 import pandas as pd
 import numpy as np
 from abc import ABC
-from pyspark.mllib.tree import GradientBoostedTrees, GradientBoostedTreesModel
-from pyspark.mllib.util import MLUtils
 from typing import Union
 import databricks.koalas as ks
+
+spark = SparkSession.builder.getOrCreate()
+
+def compute_metrics_for_binary_outcomes(actuals, predictions, threshold_positive, share_positive) -> pyspark.sql.DataFrame:
+    #If any values in the actuals are true, and not all values are true:
+    #Assume that both actuals and predictions are Spark DFs
+    actuals = actuals.select(actuals['actuals'].cast(DoubleType()))
+    num_true = actuals.agg({'actuals':'sum'}).first()[0]
+    total = actuals.count()
+    schema = StructType([
+            StructField('AUROC', FloatType(), True),
+            StructField('Predicted Share', FloatType(), True),
+            StructField('Actual Share', FloatType(), True),
+            StructField('True Positives', IntegerType(), True),
+            StructField('False Negatives', IntegerType(), True),
+            StructField('False Positives', IntegerType(), True),
+            StructField('True Negatives', IntegerType(), True)])
+    metrics = spark.createDataFrame([(.0,.0,.0,0,0,0,0)], schema = schema)
+
+    if (num_true > 0) & (num_true < total):
+        w = Window.orderBy('predictions')
+        predictions = predictions.withColumn("row_id",row_number().over(w))
+
+        w = Window.orderBy('actuals')
+        actuals = actuals.withColumn("row_id",row_number().over(w))
+        
+        preds_and_labs = predictions.join(actuals, predictions.row_id == actuals.row_id).select(predictions.predictions, actuals.actuals)
+        scoresAndLabels = preds_and_labs.rdd.map(tuple)
+        evaluator = BinaryClassificationMetrics(scoresAndLabels)
+        metrics = metrics.withColumn('AUROC', lit(evaluator.areaUnderROC))
+    
+    else:
+        metrics = metrics.withColumn('AUROC', lit(np.nan))
+
+    #Difficult to do a weighted avg in pyspark
+    mean_predict = predictions.agg({'predictions':'mean'}).first()[0]
+    mean_actual = actuals.agg({'actuals':'mean'}).first()[0]
+    metrics = metrics.withColumn('Predicted Share', lit(mean_predict))
+    metrics = metrics.withColumn('Actual Share', lit(mean_actual))
+
+    # Checks if actuals has a single row / if not then it's empty
+    if actuals.first() == None:
+        #Values are already set to zero by default
+        pass
+    
+    else:
+        if share_positive == 'predicted':
+            share_positive = lit(predictions.agg({'predictions':'mean'}).first()[0])
+        #if share_positive is not None:
+            # SPARKIFY THIS
+        #    threshold_positive = np.quantile(predictions, 1 - share_positive)
+        elif threshold_positive == 'predicted': 
+            threshold_positive = mean_predict
+            
+        preds_and_labs.withColumn('predictions', when(preds_and_labs.predictions >= threshold_positive, 1).otherwise(0))
+        TP = preds_and_labs.select(((preds_and_labs.predictions == 1) & (preds_and_labs.actuals == 1)).cast('int').alias('TP')).agg({'TP':'sum'}).first()[0]
+        TN = preds_and_labs.select(((preds_and_labs.predictions == 0) & (preds_and_labs.actuals == 0)).cast('int').alias('TN')).agg({'TN':'sum'}).first()[0]
+        FP = preds_and_labs.select(((preds_and_labs.predictions == 1) & (preds_and_labs.actuals == 0)).cast('int').alias('FP')).agg({'FP':'sum'}).first()[0]
+        FN = preds_and_labs.select(((preds_and_labs.predictions == 0) & (preds_and_labs.actuals == 1)).cast('int').alias('FN')).agg({'FN':'sum'}).first()[0]
+        
+        metrics = metrics.withColumn('True Positive', lit(TP))
+        metrics = metrics.withColumn('False Negative', lit(FN))
+        metrics = metrics.withColumn('False Positive', lit(FP))
+        metrics = metrics.withColumn('True Negative', lit(TN))
+        
+    return metrics
 
 class Modeler(ABC):
     """Set template for modelers that use panel data to produce forecasts.
@@ -94,7 +158,9 @@ class Modeler(ABC):
 
         if (config.get("INDIVIDUAL_IDENTIFIER", "") == "") and data is not None:
             config["INDIVIDUAL_IDENTIFIER"] = data.columns[0]
-            
+        
+        findspark.init()
+        self.spark = SparkSession.builder.getOrCreate()
         self.config = config
         self.data = data
         self.duration_col = duration_col
@@ -214,53 +280,55 @@ class SurvivalModeler(Modeler):
             outcome of True, and all elements of the confusion matrix. Also
             includes concordance index over the restricted mean survival time.
         """
-    filtered = self.data.filter(self.data[self.test_col])
-    min_val = filtered.select(self.data[self.period_col]).agg({self.period_col:'min'}).first()[0]
-    if subset is None:
-        subset = self.data[self.test_col] & self.data.select(self.data[self.period_col] == lit(min_val))
-    predictions = self.predict(subset=subset, cumulative=(not self.allow_gaps))
-    schema = StructType([
-                StructField('AUROC', FloatType(), True),
-                StructField('Predicted Share', FloatType(), True),
-                StructField('Actual Share', FloatType(), True),
-                StructField('True Positives', IntegerType(), True),
-                StructField('False Negatives', IntegerType(), True),
-                StructField('False Positives', IntegerType(), True),
-                StructField('True Negatives', IntegerType(), True)])
-    metrics = sc.createDataFrame(spark.sparkContext.emptyRDD, schema = schema)
-
-    lead_lengths = np.arange(self.n_intervals) + 1
-
-    for lead_length in lead_lengths:
-        actuals = self.label_data(lead_length - 1).filter(subset)
-        actuals = actuals.filter(actuals[self.max_lead_col] >= lit(lead_length))
-        weights = actuals.select(actuals[self.weight_col]) if self.weight_col in self.data.columns else None
-        actuals = actuals.select(actuals["_label"])
-        metrics.union(
-            compute_metrics_for_binary_outcome(
-                actuals,
-                predictions[:, lead_length - 1][actuals.index],
-                threshold_positive=threshold_positive,
-                share_positive=share_positive,
-                weights=weights,
-            )
-        )
-    #Pyspark dataframes don't have an index
-    #Pyspark doesn't have built-in concordance_index
-    #Maybe we can use koalas here? I believe it'll solve both problems, but at the cost of some performance
-    metrics = metrics.to_koalas
-    metrics['Lead Length'] = lead_lengths
-    metrics.set_index('Lead Length')
-    metrics["Other Metrics:"] = ""
-    metrics["C-Index"] = np.where(
-            metrics.index == 1, concordance_index_value, ""
-        )
-    metrics = metrics.dropna()
-    return metrics
+        filtered = self.data.filter(self.data[self.test_col])
+        min_val = filtered.select(self.data[self.period_col]).agg({self.period_col:'min'}).first()[0]
+        if subset is None:
+            subset = self.data[self.test_col] & self.data.select(self.data[self.period_col] == lit(min_val))
+        predictions = self.predict(subset=subset, cumulative=(not self.allow_gaps))
+        schema = StructType([
+                    StructField('AUROC', FloatType(), True),
+                    StructField('Predicted Share', FloatType(), True),
+                    StructField('Actual Share', FloatType(), True),
+                    StructField('True Positives', IntegerType(), True),
+                    StructField('False Negatives', IntegerType(), True),
+                    StructField('False Positives', IntegerType(), True),
+                    StructField('True Negatives', IntegerType(), True)])
+        metrics = self.spark.createDataFrame(self.spark.sparkContext.emptyRDD, schema = schema)
     
-    def forecast(spark_df: pyspark.sql.DataFrane, columns, allow_gaps: bool) -> pyspark.sql.DataFrame:
+        lead_lengths = np.arange(self.n_intervals) + 1
+    
+        for lead_length in lead_lengths:
+            actuals = self.label_data(lead_length - 1).filter(subset)
+            actuals = actuals.filter(actuals[self.max_lead_col] >= lit(lead_length))
+            weights = actuals.select(actuals[self.weight_col]) if self.weight_col in self.data.columns else None
+            actuals = actuals.select(actuals["_label"])
+            metrics.union(
+                compute_metrics_for_binary_outcome(
+                    actuals,
+                    predictions[:, lead_length - 1][actuals.index],
+                    threshold_positive=threshold_positive,
+                    share_positive=share_positive,
+                    weights=weights,
+                )
+            )
+        #Pyspark dataframes don't have an index
+        #Pyspark doesn't have built-in concordance_index
+        #Maybe we can use koalas here? I believe it'll solve both problems, but at the cost of some performance
+        metrics = metrics.to_koalas
+        metrics['Lead Length'] = lead_lengths
+        metrics.set_index('Lead Length')
+        metrics["Other Metrics:"] = ""
+        #TO DO: code parallelized c-index or convert pyspark dfs into lists
+        metrics = metrics.dropna()
+        return metrics
+    
+    def forecast(self) -> pyspark.sql.DataFrame:
         columns = [str(i + 1) + "-period Survival Probability" for i in range(self.n_intervals)]
+        forecasts = self.predict(subset=self.data[self.predict_col], cumulative=(not self.allow_gaps))
+        forecasts = forecasts.to_koalas()
+        index = self.data.filter(self.data[self.predict_col]).select(self.data[self.config["individual_identifier"]])
         forecasts.columns = columns
+        forecasts.set_index = index
         return forecasts
     
     def subset_for_training_horizon(self, data: pyspark.sql.DataFrame, time_horizon: int) -> pyspark.sql.DataFrame:
