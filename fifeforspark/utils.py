@@ -1,6 +1,7 @@
 from pyspark.sql import SparkSession
 import pandas as pd
 import findspark
+import pyspark
 from pyspark.mllib.random import RandomRDDs
 import numpy as np
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, FloatType
@@ -9,9 +10,9 @@ import argparse
 
 
 def create_example_data1(n_persons: int = 3, n_periods: int = 12
-) -> pd.core.frame.DataFrame:
+) -> pyspark.sql.DataFrame:
     findspark.init()
-    sc = SparkSession.builder.getOrCreate()
+    spark = SparkSession.builder.getOrCreate()
     schema = StructType([
         StructField('individual', StringType(), True),
         StructField('period', StringType(), True),
@@ -19,34 +20,34 @@ def create_example_data1(n_persons: int = 3, n_periods: int = 12
         StructField('feature_2', StringType(), True),
         StructField('feature_3', StringType(), True),
         StructField('feature_4', StringType(), True)])
-    values = sc.createDataFrame([], schema)
+    values = spark.createDataFrame([], schema)
     for i in np.arange(n_persons):
             period = np.random.randint(n_periods)+1 #Sparkify this
-            rdd1 = RandomRDDs.uniformRDD(sc,size = 1, seed = 9999)
+            rdd1 = RandomRDDs.uniformRDD(spark,size = 1, seed = 9999)
             x_1 = rdd1.first()
 
-            obj1 = sc.sparkContext.parallelize(["A","B","C"])
+            obj1 = spark.sparkContext.parallelize(["A","B","C"])
             x_2 = obj1.takeSample(False, 1, seed = 9999)[0]
 
-            rdd3 = RandomRDDs.uniformRDD(sc, size = 1, seed = 9999).map(lambda v: 1 + v)
+            rdd3 = RandomRDDs.uniformRDD(spark, size = 1, seed = 9999).map(lambda v: 1 + v)
             x_3 = rdd3.first()
 
-            obj2 = sc.sparkContext.parallelize(["a","b","c", 1, 2, 3, np.nan])
+            obj2 = spark.sparkContext.parallelize(["a","b","c", 1, 2, 3, np.nan])
             x_4 = obj2.takeSample(False, 1, seed = 9999)[0]
             while period <= n_periods:
                     print(period)
-                    values = values.union(sc.createDataFrame([(int(i), period, x_1, x_2, x_3, x_4)]))
+                    values = values.union(spark.createDataFrame([(int(i), period, x_1, x_2, x_3, x_4)]))
                     if x_2 == 'A':
-                        unif_point1 = RandomRDDs.uniformRDD(sc, size = 1, seed = 9999).map(lambda v: (.1) * v)
+                        unif_point1 = RandomRDDs.uniformRDD(spark, size = 1, seed = 9999).map(lambda v: (.1) * v)
                         x_1 += unif_point1.first()
                     else:
-                        unif_point2 = RandomRDDs.uniformRDD(sc, size = 1, seed = 9999).map(lambda v: (.2) * v)
+                        unif_point2 = RandomRDDs.uniformRDD(spark, size = 1, seed = 9999).map(lambda v: (.2) * v)
                         x_1 += unif_point2.first()
                     if x_1 > np.sqrt(x_3):
                         break
                     if x_4 in obj2.take(5):
                         x_4_transition_value = obj2.collect()[obj2.collect().index(x_4) + 1] #Remove all these collects
-                        if RandomRDDs.uniformRDD(sc, size = 1, seed = 9999).first() >= 0.75:
+                        if RandomRDDs.uniformRDD(spark, size = 1, seed = 9999).first() >= 0.75:
                             x_4 = x_4_transition_value 
                             del x_4_transition_value
                     period += 1
@@ -55,10 +56,10 @@ def create_example_data1(n_persons: int = 3, n_periods: int = 12
 
 def create_example_data2(
     n_persons: int = 8192, n_periods: int = 20
-) -> pd.core.frame.DataFrame:
+) -> pyspark.sql.DataFrame:
     """Fabricate an unbalanced panel dataset suitable as FIFE input."""
     findspark.init()
-    sc = SparkSession.builder.getOrCreate()
+    spark = SparkSession.builder.getOrCreate()
     seed = 9999
     np.random.seed(seed)
     values = []
@@ -104,7 +105,7 @@ def create_example_data2(
         StructField('feature_3', FloatType(), True),
         StructField('feature_4', StringType(), True),
         StructField('feature_5', StringType(), True)])
-    return sc.createDataFrame(values, schema = schema)
+    return spark.createDataFrame(values, schema = schema)
 
 class FIFEArgParser(argparse.ArgumentParser):
     """Argument parser for the FIFE command-line interface."""
