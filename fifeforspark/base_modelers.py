@@ -1,5 +1,5 @@
-from pyspark.sql import SparkSession, Window
-from pyspark.sql.functions import lit, when
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import lit, when, monotonically_increasing_id
 import findspark
 import pyspark
 from pyspark.mllib.evaluation import BinaryClassificationMetrics
@@ -10,9 +10,25 @@ from abc import ABC
 from typing import Union
 import databricks.koalas as ks
 
+findspark.init()
+sc = SparkSession.builder.getOrCreate()
+
 spark = SparkSession.builder.getOrCreate()
 
-def compute_metrics_for_binary_outcomes(actuals, predictions, threshold_positive, share_positive) -> pyspark.sql.DataFrame:
+def default_subset_to_all(    
+    subset: Union[None, pd.core.series.Series], data: pyspark.sql.DataFrame
+) -> pyspark.sql.DataFrame:
+    """Map an unspecified subset to an entirely True boolean mask."""
+    if subset is None:
+        data = data.withColumn('True_mask', lit(True))
+        subset = data.select(data['True_mask'])
+        data = data.drop('True mask')
+        return subset
+    return subset
+
+def compute_metrics_for_binary_outcomes(
+        actuals, predictions, threshold_positive: Union[None, str, float] = 0.5, share_positive: Union[None, str, float] = None
+) -> pyspark.sql.DataFrame:
     #If any values in the actuals are true, and not all values are true:
     #Assume that both actuals and predictions are Spark DFs
     actuals = actuals.select(actuals['actuals'].cast(DoubleType()))
@@ -26,15 +42,11 @@ def compute_metrics_for_binary_outcomes(actuals, predictions, threshold_positive
             StructField('False Negatives', IntegerType(), True),
             StructField('False Positives', IntegerType(), True),
             StructField('True Negatives', IntegerType(), True)])
-    metrics = spark.createDataFrame([(.0,.0,.0,0,0,0,0)], schema = schema)
+    metrics = sc.createDataFrame([(.0,.0,.0,0,0,0,0)], schema = schema)
 
     if (num_true > 0) & (num_true < total):
-        w = Window.orderBy('predictions')
-        predictions = predictions.withColumn("row_id",row_number().over(w))
-
-        w = Window.orderBy('actuals')
-        actuals = actuals.withColumn("row_id",row_number().over(w))
-        
+        predictions = predictions.withColumn("row_id", monotonically_increasing_id())
+        actuals = actuals.withColumn("row_id", monotonically_increasing_id())
         preds_and_labs = predictions.join(actuals, predictions.row_id == actuals.row_id).select(predictions.predictions, actuals.actuals)
         scoresAndLabels = preds_and_labs.rdd.map(tuple)
         evaluator = BinaryClassificationMetrics(scoresAndLabels)
@@ -43,36 +55,31 @@ def compute_metrics_for_binary_outcomes(actuals, predictions, threshold_positive
     else:
         metrics = metrics.withColumn('AUROC', lit(np.nan))
 
-    #Difficult to do a weighted avg in pyspark
+    #Difficult to do a weighted avg in pyspark, leaving out for now
     mean_predict = predictions.agg({'predictions':'mean'}).first()[0]
     mean_actual = actuals.agg({'actuals':'mean'}).first()[0]
     metrics = metrics.withColumn('Predicted Share', lit(mean_predict))
     metrics = metrics.withColumn('Actual Share', lit(mean_actual))
 
-    # Checks if actuals has a single row / if not then it's empty
-    if actuals.first() == None:
-        #Values are already set to zero by default
-        pass
-    
-    else:
+    # Checks if actuals doesn't have a single row, if so then it's not empty
+    if actuals.first() is not None:
         if share_positive == 'predicted':
-            share_positive = lit(predictions.agg({'predictions':'mean'}).first()[0])
-        #if share_positive is not None:
-            # SPARKIFY THIS
-        #    threshold_positive = np.quantile(predictions, 1 - share_positive)
+            share_positive = predictions.agg({'predictions':'mean'}).first()[0]
+        if share_positive is not None:
+            threshold_positive = predictions.approxQuantile('predictions', [1-share_positive], relativeError = 0)[0]
         elif threshold_positive == 'predicted': 
             threshold_positive = mean_predict
             
-        preds_and_labs.withColumn('predictions', when(preds_and_labs.predictions >= threshold_positive, 1).otherwise(0))
+        preds_and_labs = preds_and_labs.withColumn('predictions', when(preds_and_labs.predictions >= threshold_positive, 1).otherwise(0))
         TP = preds_and_labs.select(((preds_and_labs.predictions == 1) & (preds_and_labs.actuals == 1)).cast('int').alias('TP')).agg({'TP':'sum'}).first()[0]
         TN = preds_and_labs.select(((preds_and_labs.predictions == 0) & (preds_and_labs.actuals == 0)).cast('int').alias('TN')).agg({'TN':'sum'}).first()[0]
         FP = preds_and_labs.select(((preds_and_labs.predictions == 1) & (preds_and_labs.actuals == 0)).cast('int').alias('FP')).agg({'FP':'sum'}).first()[0]
         FN = preds_and_labs.select(((preds_and_labs.predictions == 0) & (preds_and_labs.actuals == 1)).cast('int').alias('FN')).agg({'FN':'sum'}).first()[0]
         
-        metrics = metrics.withColumn('True Positive', lit(TP))
-        metrics = metrics.withColumn('False Negative', lit(FN))
-        metrics = metrics.withColumn('False Positive', lit(FP))
-        metrics = metrics.withColumn('True Negative', lit(TN))
+        metrics = metrics.withColumn('True Positives', lit(TP))
+        metrics = metrics.withColumn('False Negatives', lit(FN))
+        metrics = metrics.withColumn('False Positives', lit(FP))
+        metrics = metrics.withColumn('True Negatives', lit(TN))
         
     return metrics
 
@@ -293,7 +300,7 @@ class SurvivalModeler(Modeler):
                     StructField('False Negatives', IntegerType(), True),
                     StructField('False Positives', IntegerType(), True),
                     StructField('True Negatives', IntegerType(), True)])
-        metrics = self.spark.createDataFrame(self.spark.sparkContext.emptyRDD, schema = schema)
+        metrics = self.spark.createDataFrame(self.spark.sparkContext.emptyRDD(), schema = schema)
     
         lead_lengths = np.arange(self.n_intervals) + 1
     
@@ -303,7 +310,7 @@ class SurvivalModeler(Modeler):
             weights = actuals.select(actuals[self.weight_col]) if self.weight_col in self.data.columns else None
             actuals = actuals.select(actuals["_label"])
             metrics.union(
-                compute_metrics_for_binary_outcome(
+                compute_metrics_for_binary_outcomes(
                     actuals,
                     predictions[:, lead_length - 1][actuals.index],
                     threshold_positive=threshold_positive,
