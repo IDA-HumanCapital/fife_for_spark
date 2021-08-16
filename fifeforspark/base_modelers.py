@@ -6,12 +6,11 @@ from pyspark.mllib.evaluation import BinaryClassificationMetrics
 from pyspark.sql.types import *
 import pandas as pd
 import numpy as np
-from abc import ABC
-from typing import Union
+from abc import ABC, abstractmethod
+from typing import Union, Any
 import databricks.koalas as ks
 
 findspark.init()
-sc = SparkSession.builder.getOrCreate()
 
 spark = SparkSession.builder.getOrCreate()
 
@@ -199,19 +198,64 @@ class Modeler(ABC):
             self.numeric_features = [feature for feature in self.data.columns
                 if feature not in (self.categorical_features + self.reserved_cols)]
             self.data = self.transform_features()
+            
+    @abstractmethod
+    def train(self) -> Any:
+        """Train and return a model."""
+    
+    @abstractmethod
+    def predict(
+        self, subset: Union[None, pyspark.sql.column.Column] = None, cumulative: bool = True
+    ) -> np.ndarray:
+        """Use trained model to produce observation survival probabilities."""
+    
+    @abstractmethod
+    def evaluate(
+        self,
+        subset: Union[None, pyspark.sql.column.Column] = None,
+        threshold_positive: Union[None, str, float] = 0.5,
+        share_positive: Union[None, str, float] = None,
+    ) -> ks.frame.DataFrame:
+        """Tabulate model performance metrics."""
+    
+    @abstractmethod
+    def forecast(self) -> pyspark.sql.DataFrame:
+        """Tabulate survival probabilities for most recent observations."""
+    
+    @abstractmethod
+    def subset_for_training_horizon(
+        self, data: pyspark.sql.DataFrame, time_horizon: int
+    ) -> pyspark.sql.DataFrame:
+        """Return only observations where the outcome is observed."""
+    
+    @abstractmethod
+    def label_data(self, time_horizon: int) -> pyspark.sql.DataFrame:
+        """Return data with an outcome label for each observation."""
+    
+    @abstractmethod
+    def save_model(self, path: str = "") -> None:
+        """Save model file(s) to disk."""
+    
+    @abstractmethod
+    def transform_features(self) -> pyspark.sql.DataFrame:
+        """Transform datetime features to suit model training."""
+    
+    @abstractmethod
+    def build_model(self, n_intervals: Union[None, int] = None) -> None:
+        """Configure, train, and store a model."""
                  
     def set_n_intervals(self) -> int:
         """Determine the maximum periods ahead the model will predict."""
         train_durations = self.data.select(
             when(
-                self.duration_col <= self.max_lead_col, self.duration_col
-                ).otherwise(self.max_lead_col).alias('max_durations')
+                self.data[self.duration_col] <= self.data[self.max_lead_col], self.data[self.duration_col]
+                ).otherwise(self.data[self.max_lead_col]).alias('max_durations')
         )
         subset = ~self.data[self.validation_col] & ~self.data[self.test_col] & ~self.data[self.predict_col]
         train_obs_by_lead_length = train_durations.filter(subset)
         train_obs_by_lead_length.groupBy('max_durations').count()
         n_intervals = train_obs_by_lead_length.select(
-            train_obs_by_lead_length.max_durations > self.config.get("MIN_SURVIVORS_IN_TRAIN", 64).alias('max_durations')
+            train_obs_by_lead_length.max_durations > self.config.get("min_survivors_in_train", 64).alias('max_durations')
         ).agg(
             {'max_durations':'max'}
         ).first()[0]
@@ -335,7 +379,7 @@ class SurvivalModeler(Modeler):
         forecasts = forecasts.to_koalas()
         index = self.data.filter(self.data[self.predict_col]).select(self.data[self.config["individual_identifier"]])
         forecasts.columns = columns
-        forecasts.set_index = index
+        forecasts['index'] = index
         return forecasts
     
     def subset_for_training_horizon(self, data: pyspark.sql.DataFrame, time_horizon: int) -> pyspark.sql.DataFrame:
@@ -344,20 +388,20 @@ class SurvivalModeler(Modeler):
             return data.select(data[self.max_lead_col] > lit(time_horizon))
         return data.select((data[self.duration_col] + data[self.event_col]).cast('int') > lit(time_horizon))
     
-    def label_data(self, time_horizon: int, duration_col: str, max_lead_col: str) -> pyspark.sql.DataFrame:
+    def label_data(self, time_horizon: int) -> pyspark.sql.DataFrame:
         """Return data with an indicator for survival for each observation."""
         #Spark automatically creates a copy when setting one value equal to another, different from python
-        spark_df = self
-        spark_df = spark_df.withColumn(duration_col, when(duration_col <= max_lead_col, duration_col).otherwise(max_lead_col))
+        spark_df = self.data
+        spark_df = spark_df.withColumn(spark_df[self.duration_col], when(spark_df[self.duration_col] <= spark_df[self.max_lead_col], spark_df[self.duration_col]).otherwise(spark_df[self.max_lead_col]))
         if self.allow_gaps:
-            ids = spark_df[self.config["INDIVIDUAL_IDENTIFIER"], self.config["TIME_IDENTIFIER"]]
-            ids = ids.withColumn(self.config["INDIVIDUAL_IDENTIFIER"] + '_new', ids[self.config["INDIVIDUAL_IDENTIFIER"]])
-            ids = ids.withColumn(self.config["TIME_IDENTIFIER"] + '_new', ids[self.config["TIME_IDENTIFIER"]] - time_horizon - 1)
+            ids = spark_df[self.config["individual_identifier"], self.config["time_identifer"]]
+            ids = ids.withColumn(self.config["individual_identifier"] + '_new', ids[self.config["individual_identifier"]])
+            ids = ids.withColumn(self.config["time_identifier"] + '_new', ids[self.config["time_identifer"]] - time_horizon - 1)
             ids = ids.withColumn('_label', lit(True))
-            ids = ids.drop(self.config["INDIVIDUAL_IDENTIFIER"], self.config["TIME_IDENTIFIER"])
+            ids = ids.drop(self.config["individual_identifier"], self.config["time_identifier"])
             
-            spark_df = spark_df.join(ids,(spark_df[self.config["INDIVIDUAL_IDENTIFIER"]] == ids[self.config["INDIVIDUAL_IDENTIFIER"]]) & (spark_df[self.config["TIME_IDENTIFIER"]] == ids[self.config["TIME_IDENTIFIER"]]),"left")
-            spark_df = spark_df.drop(self.config["INDIVIDUAL_IDENTIFIER"] + '_new', self.config["TIME_IDENTIFIER"] + '_new')
+            spark_df = spark_df.join(ids,(spark_df[self.config["individual_identifier"]] == ids[self.config["individual_identifier"]]) & (spark_df[self.config["time_identifier"]] == ids[self.config["time_identifier"]]),"left")
+            spark_df = spark_df.drop(self.config["individual_identifier"] + '_new', self.config["time_identifier"] + '_new')
             spark_df = spark_df.fillna(False, subset = ['_label'])
         else:
             spark_df.withColumn('_label', spark_df[self.duration_col] > lit(time_horizon))
