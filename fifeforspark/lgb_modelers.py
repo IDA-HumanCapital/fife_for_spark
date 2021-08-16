@@ -1,15 +1,10 @@
 """FIFE modelers based on LightGBM, which trains gradient-boosted trees."""
 
-import json
 from typing import List, Union
-from warnings import warn
 
 from fifeforspark.base_modelers import default_subset_to_all, Modeler, SurvivalModeler
-import pyspark
 import pyspark.sql
-import pyspark.sql.functions as F
-from pyspark.sql.types import StructType, StructField, IntegerType, StringType, DoubleType, TimestampType
-from pyspark.ml import Pipeline
+\from pyspark.ml import Pipeline
 from pyspark.ml.feature import VectorAssembler, StringIndexer
 
 import mmlspark.lightgbm.LightGBMClassifier as lgb
