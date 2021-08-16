@@ -4,7 +4,7 @@ from typing import List, Union
 
 from fifeforspark.base_modelers import default_subset_to_all, Modeler, SurvivalModeler
 import pyspark.sql
-\from pyspark.ml import Pipeline
+from pyspark.ml import Pipeline
 from pyspark.ml.feature import VectorAssembler, StringIndexer
 
 import mmlspark.lightgbm.LightGBMClassifier as lgb
