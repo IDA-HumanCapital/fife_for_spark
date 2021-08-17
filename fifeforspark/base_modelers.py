@@ -6,9 +6,11 @@ from pyspark.mllib.evaluation import BinaryClassificationMetrics
 from pyspark.sql.types import *
 import pandas as pd
 import numpy as np
+from lifelines.utils import concordance_index
 from abc import ABC, abstractmethod
 from typing import Union, Any
 import databricks.koalas as ks
+from collections import OrderedDict
 
 findspark.init()
 
@@ -26,46 +28,36 @@ def default_subset_to_all(
     return subset
 
 def compute_metrics_for_binary_outcomes(
-        actuals, predictions, threshold_positive: Union[None, str, float] = 0.5, share_positive: Union[None, str, float] = None
-) -> pyspark.sql.DataFrame:
-    #If any values in the actuals are true, and not all values are true:
-    #Assume that both actuals and predictions are Spark DFs
+    actuals: pyspark.sql.DataFrame, predictions: pyspark.sql.DataFrame, 
+    threshold_positive: Union[None, str, float] = 0.5, share_positive: Union[None, str, float] = None
+) -> OrderedDict:
     actuals = actuals.select(actuals['actuals'].cast(DoubleType()))
     num_true = actuals.agg({'actuals':'sum'}).first()[0]
     total = actuals.count()
-    schema = StructType([
-            StructField('AUROC', FloatType(), True),
-            StructField('Predicted Share', FloatType(), True),
-            StructField('Actual Share', FloatType(), True),
-            StructField('True Positives', IntegerType(), True),
-            StructField('False Negatives', IntegerType(), True),
-            StructField('False Positives', IntegerType(), True),
-            StructField('True Negatives', IntegerType(), True)])
-    metrics = sc.createDataFrame([(.0,.0,.0,0,0,0,0)], schema = schema)
-
+    metrics = OrderedDict()
     if (num_true > 0) & (num_true < total):
         predictions = predictions.withColumn("row_id", monotonically_increasing_id())
         actuals = actuals.withColumn("row_id", monotonically_increasing_id())
         preds_and_labs = predictions.join(actuals, predictions.row_id == actuals.row_id).select(predictions.predictions, actuals.actuals)
         scoresAndLabels = preds_and_labs.rdd.map(tuple)
         evaluator = BinaryClassificationMetrics(scoresAndLabels)
-        metrics = metrics.withColumn('AUROC', lit(evaluator.areaUnderROC))
+        metrics['AUROC'] = evaluator.areaUnderROC
     
     else:
-        metrics = metrics.withColumn('AUROC', lit(np.nan))
+        metrics["AUROC"] = np.nan
 
     #Difficult to do a weighted avg in pyspark, leaving out for now
     mean_predict = predictions.agg({'predictions':'mean'}).first()[0]
     mean_actual = actuals.agg({'actuals':'mean'}).first()[0]
-    metrics = metrics.withColumn('Predicted Share', lit(mean_predict))
-    metrics = metrics.withColumn('Actual Share', lit(mean_actual))
+    metrics["Predicted Share"] = mean_predict
+    metrics["Actual Share"] = mean_actual
 
     # Checks if actuals doesn't have a single row, if so then it's not empty
     if actuals.first() is not None:
         if share_positive == 'predicted':
             share_positive = predictions.agg({'predictions':'mean'}).first()[0]
         if share_positive is not None:
-            threshold_positive = predictions.approxQuantile('predictions', [1-share_positive], relativeError = 0)[0]
+            threshold_positive = predictions.approxQuantile('predictions', [1-share_positive], relativeError = .1)[0]
         elif threshold_positive == 'predicted': 
             threshold_positive = mean_predict
             
@@ -75,11 +67,10 @@ def compute_metrics_for_binary_outcomes(
         FP = preds_and_labs.select(((preds_and_labs.predictions == 1) & (preds_and_labs.actuals == 0)).cast('int').alias('FP')).agg({'FP':'sum'}).first()[0]
         FN = preds_and_labs.select(((preds_and_labs.predictions == 0) & (preds_and_labs.actuals == 1)).cast('int').alias('FN')).agg({'FN':'sum'}).first()[0]
         
-        metrics = metrics.withColumn('True Positives', lit(TP))
-        metrics = metrics.withColumn('False Negatives', lit(FN))
-        metrics = metrics.withColumn('False Positives', lit(FP))
-        metrics = metrics.withColumn('True Negatives', lit(TN))
-        
+        metrics["True Positives"] = TP
+        metrics["False Negatives"] = FN
+        metrics["False Positives"] = FP
+        metrics["True Negatives"] = TN
     return metrics
 
 class Modeler(ABC):
@@ -308,7 +299,7 @@ class SurvivalModeler(Modeler):
         subset: Union[None, pyspark.sql.column.Column] = None,
         threshold_positive: Union[None, str, float] = 0.5,
         share_positive: Union[None, str, float] = None,
-    ) -> ks.frame.DataFrame:
+    ) -> pd.core.frame.DataFrame:
         """Tabulate model performance metrics.
         Args:
             subset: A Boolean Series that is True for observations over which
@@ -336,24 +327,14 @@ class SurvivalModeler(Modeler):
         if subset is None:
             subset = self.data[self.test_col] & self.data.select(self.data[self.period_col] == lit(min_val))
         predictions = self.predict(subset=subset, cumulative=(not self.allow_gaps))
-        schema = StructType([
-                    StructField('AUROC', FloatType(), True),
-                    StructField('Predicted Share', FloatType(), True),
-                    StructField('Actual Share', FloatType(), True),
-                    StructField('True Positives', IntegerType(), True),
-                    StructField('False Negatives', IntegerType(), True),
-                    StructField('False Positives', IntegerType(), True),
-                    StructField('True Negatives', IntegerType(), True)])
-        metrics = self.spark.createDataFrame(self.spark.sparkContext.emptyRDD(), schema = schema)
-    
         lead_lengths = np.arange(self.n_intervals) + 1
-    
+        metrics = []
         for lead_length in lead_lengths:
             actuals = self.label_data(lead_length - 1).filter(subset)
             actuals = actuals.filter(actuals[self.max_lead_col] >= lit(lead_length))
             weights = actuals.select(actuals[self.weight_col]) if self.weight_col in self.data.columns else None
             actuals = actuals.select(actuals["_label"])
-            metrics.union(
+            metrics.append(
                 compute_metrics_for_binary_outcomes(
                     actuals,
                     predictions[:, lead_length - 1][actuals.index],
@@ -362,14 +343,18 @@ class SurvivalModeler(Modeler):
                     weights=weights,
                 )
             )
-        #Pyspark dataframes don't have an index
-        #Pyspark doesn't have built-in concordance_index
-        #Maybe we can use koalas here? I believe it'll solve both problems, but at the cost of some performance
-        metrics = metrics.to_koalas
-        metrics['Lead Length'] = lead_lengths
-        metrics.set_index('Lead Length')
+        metrics = pd.DataFrame(metrics, index=lead_lengths)
+        metrics.index.name = "Lead Length"
         metrics["Other Metrics:"] = ""
-        #TO DO: code parallelized c-index or convert pyspark dfs into lists
+        if (not self.allow_gaps) and (self.weight_col is None):
+            concordance_index_value = concordance_index(
+                self.data[subset][[self.duration_col, self.max_lead_col]].min(axis=1),
+                np.sum(predictions, axis=-1),
+                self.data[subset][self.event_col],
+            )
+            metrics["C-Index"] = np.where(
+                metrics.index == 1, concordance_index_value, ""
+            )
         metrics = metrics.dropna()
         return metrics
     
@@ -385,8 +370,8 @@ class SurvivalModeler(Modeler):
     def subset_for_training_horizon(self, data: pyspark.sql.DataFrame, time_horizon: int) -> pyspark.sql.DataFrame:
         """Return only observations where survival would be observed."""
         if self.allow_gaps:
-            return data.select(data[self.max_lead_col] > lit(time_horizon))
-        return data.select((data[self.duration_col] + data[self.event_col]).cast('int') > lit(time_horizon))
+            return data.filter(data[self.max_lead_col] > lit(time_horizon))
+        return data.filter((data[self.duration_col] + data[self.event_col]).cast('int') > lit(time_horizon))
     
     def label_data(self, time_horizon: int) -> pyspark.sql.DataFrame:
         """Return data with an indicator for survival for each observation."""
