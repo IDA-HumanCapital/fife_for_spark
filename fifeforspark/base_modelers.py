@@ -51,7 +51,6 @@ def compute_metrics_for_binary_outcomes(
     mean_actual = actuals.agg({'actuals':'mean'}).first()[0]
     metrics["Predicted Share"] = mean_predict
     metrics["Actual Share"] = mean_actual
-
     # Checks if actuals doesn't have a single row, if so then it's not empty
     if actuals.first() is not None:
         if share_positive == 'predicted':
@@ -71,6 +70,7 @@ def compute_metrics_for_binary_outcomes(
         metrics["False Negatives"] = FN
         metrics["False Positives"] = FP
         metrics["True Negatives"] = TN
+
     return metrics
 
 class Modeler(ABC):

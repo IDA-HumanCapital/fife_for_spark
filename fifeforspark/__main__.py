@@ -11,7 +11,7 @@ def parse_config() -> dict:
 def main():
     config = parse_config()
     spark_df = utils.create_example_data2(n_persons = 100, n_periods = 12)
-    data_processor = processors.PanelDataProcessor(config, spark_df)
+    data_processor = processors.PanelDataProcessor(config, spark_df, shuffle_parts = 50)
     data_processor.build_processed_data()
     data_processor.data.show()
 

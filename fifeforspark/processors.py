@@ -13,7 +13,7 @@ from warnings import warn
 class DataProcessor:
     """Prepare data by identifying features as degenerate or categorical."""
 
-    def __init__(self, config={}, data=None) -> None:
+    def __init__(self, config={}, data=None, shuffle_parts = 200) -> None:
         """Initialize the DataProcessor.
         Args:
             config: A dictionary of configuration parameters.
@@ -29,6 +29,7 @@ class DataProcessor:
             )
         self.config = config
         self.data = data
+        self.spark.conf.set("spark.sql.shuffle.partitions", shuffle_parts)
 
     def check_column_consistency(self, colname: str) -> None:
         """Assert column exists, has no missing values, and is not constant."""
