@@ -162,11 +162,11 @@ class Modeler(ABC):
                 between the period of observations and the last period of the
                 given time horizon.
         """
-        if (config.get("TIME_IDENTIFIER", "") == "") and data is not None:
-            config["TIME_IDENTIFIER"] = data.columns[1]
+        if (config.get("time_identifier", "") == "") and data is not None:
+            config["time_identifier"] = data.columns[1]
 
-        if (config.get("INDIVIDUAL_IDENTIFIER", "") == "") and data is not None:
-            config["INDIVIDUAL_IDENTIFIER"] = data.columns[0]
+        if (config.get("individual_identifier", "") == "") and data is not None:
+            config["individual_identifier"] = data.columns[0]
 
         findspark.init()
         self.spark = SparkSession.builder.getOrCreate()
@@ -193,7 +193,7 @@ class Modeler(ABC):
             self.spell_col,
         ]
         if self.config:
-            self.reserved_cols.append(self.config["INDIVIDUAL_IDENTIFIER"])
+            self.reserved_cols.append(self.config["individual_identifier"])
         if self.weight_col:
             self.reserved_cols.append(self.weight_col)
         if self.data is not None:
@@ -257,11 +257,10 @@ class Modeler(ABC):
         )
         subset = ~self.data[self.validation_col] & ~self.data[self.test_col] & ~self.data[self.predict_col]
         train_obs_by_lead_length = train_durations.filter(subset)
-        train_obs_by_lead_length.groupBy('max_durations').count()
-        n_intervals = train_obs_by_lead_length.select(
-            train_obs_by_lead_length.max_durations > self.config.get(
-                "min_survivors_in_train", 64).alias('max_durations')
-        ).agg(
+        train_obs_by_lead_length = train_obs_by_lead_length.groupBy('max_durations').count()
+        n_intervals = train_obs_by_lead_length.filter(
+            train_obs_by_lead_length['count'] > self.config.get(
+                "min_survivors_in_train", 64).alias('max_durations')).agg(
             {'max_durations': 'max'}
         ).first()[0]
         return n_intervals
@@ -355,7 +354,7 @@ class SurvivalModeler(Modeler):
             metrics.append(
                 compute_metrics_for_binary_outcomes(
                     actuals,
-                    predictions[:, lead_length - 1][actuals.index],
+                    predictions.select(predictions[lead_length - 1]).limit(actuals.count()),
                     threshold_positive=threshold_positive,
                     share_positive=share_positive,
                 )
@@ -376,7 +375,7 @@ class SurvivalModeler(Modeler):
         metrics = metrics.dropna()
         return metrics
 
-    def forecast(self) -> pyspark.sql.DataFrame:
+    def forecast(self) -> ks.DataFrame:
         columns = [
             str(i + 1) + "-period Survival Probability" for i in range(self.n_intervals)]
         forecasts = self.predict(
@@ -391,8 +390,8 @@ class SurvivalModeler(Modeler):
     def subset_for_training_horizon(self, data: pyspark.sql.DataFrame, time_horizon: int) -> pyspark.sql.DataFrame:
         """Return only observations where survival would be observed."""
         if self.allow_gaps:
-            return data.filter(data[self.max_lead_col] > lit(time_horizon))
-        return data.filter((data[self.duration_col] + data[self.event_col]).cast('int') > lit(time_horizon))
+            return data.filter(data[self.max_lead_col] > time_horizon)
+        return data.filter((data[self.duration_col] + data[self.event_col]).cast('int') > time_horizon)
 
     def label_data(self, time_horizon: int) -> pyspark.sql.DataFrame:
         """Return data with an indicator for survival for each observation."""
