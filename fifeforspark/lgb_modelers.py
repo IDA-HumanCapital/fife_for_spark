@@ -3,8 +3,6 @@
 from typing import List, Union
 
 import mmlspark.lightgbm.LightGBMClassifier as lgb
-import numpy as np
-import pandas as pd
 import pyspark.sql
 from pyspark.ml import Pipeline
 from pyspark.ml.feature import VectorAssembler, StringIndexer
