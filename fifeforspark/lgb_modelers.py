@@ -2,15 +2,14 @@
 
 from typing import List, Union
 
-from fifeforspark.base_modelers import default_subset_to_all, Modeler, SurvivalModeler
+import mmlspark.lightgbm.LightGBMClassifier as lgb
+import numpy as np
+import pandas as pd
 import pyspark.sql
 from pyspark.ml import Pipeline
 from pyspark.ml.feature import VectorAssembler, StringIndexer
 
-import mmlspark.lightgbm.LightGBMClassifier as lgb
-
-import pandas as pd
-import numpy as np
+from fifeforspark.base_modelers import default_subset_to_all, Modeler, SurvivalModeler
 
 
 class LGBModeler(Modeler):
@@ -49,9 +48,9 @@ class LGBModeler(Modeler):
     """
 
     def build_model(
-        self,
-        n_intervals: Union[None, int] = None,
-        params: dict = None
+            self,
+            n_intervals: Union[None, int] = None,
+            params: dict = None
     ) -> None:
         """Train and store a sequence of gradient-boosted tree models."""
         if n_intervals:
@@ -63,10 +62,10 @@ class LGBModeler(Modeler):
         )
 
     def train(
-        self,
-        params: Union[None, dict] = None,
-        subset: Union[None, pyspark.sql.column.Column] = None,
-        validation_early_stopping: bool = True,
+            self,
+            params: Union[None, dict] = None,
+            subset: Union[None, pyspark.sql.column.Column] = None,
+            validation_early_stopping: bool = True,
     ) -> List[pyspark.ml.pipeline.PipelineModel]:
         """Train a LightGBM model for each lead length."""
         models = []
@@ -82,10 +81,10 @@ class LGBModeler(Modeler):
         return models
 
     def train_single_model(
-        self,
-        time_horizon: int,
-        params: Union[None, dict] = None,
-        subset: Union[None, pyspark.sql.column.Column] = None
+            self,
+            time_horizon: int,
+            params: Union[None, dict] = None,
+            subset: Union[None, pyspark.sql.column.Column] = None
     ) -> pyspark.ml.pipeline.PipelineModel:
         """Train a LightGBM model for a single lead length."""
         if params is None:
@@ -103,25 +102,25 @@ class LGBModeler(Modeler):
         data = self.subset_for_training_horizon(data, time_horizon)
 
         train_data = data.filter(~data[self.validation_col])[
-                self.categorical_features + self.numeric_features
+            self.categorical_features + self.numeric_features
             ]
-        indexers = [StringIndexer(inputCol=column, outputCol=column+"_index").fit(data).transform(data)
+        indexers = [StringIndexer(inputCol=column, outputCol=column + "_index").fit(data).transform(data)
                     for column in self.categorical_features]
         feature_columns = [column + "_index" for column in self.categorical_features] + self.numeric_features
         assembler = VectorAssembler(inputCols=feature_columns, outputCol='features')
         lgb_model = lgb(featuresCol="features",
-                                       labelCol="_label",
-                                       *params[time_horizon],
-                                       class_weight=data.filter(~data[self.validation_col])[self.weight_col]
-                                       if self.weight_col
-                                       else None
-                                       )
+                        labelCol="_label",
+                        *params[time_horizon],
+                        class_weight=data.filter(~data[self.validation_col])[self.weight_col]
+                        if self.weight_col
+                        else None
+                        )
         pipeline = Pipeline(stages=[*indexers, assembler, lgb_model])
         model = pipeline.fit(train_data)
         return model
 
     def predict(
-        self, subset: Union[None, pyspark.sql.column.Column] = None, cumulative: bool = True
+            self, subset: Union[None, pyspark.sql.column.Column] = None, cumulative: bool = True
     ) -> np.ndarray:
         """Use trained LightGBM models to predict the outcome for each observation and time horizon.
         Args:
@@ -166,4 +165,3 @@ class LGBSurvivalModeler(LGBModeler, SurvivalModeler):
     """Use LightGBM to forecast probabilities of being observed in future periods."""
 
     pass
-
