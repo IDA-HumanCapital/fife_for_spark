@@ -8,7 +8,7 @@ import pandas as pd
 import pyspark.sql
 from pyspark.ml import Pipeline
 from pyspark.ml.feature import VectorAssembler, StringIndexer
-from pyspark.sql.functions import udf
+from pyspark.sql.functions import udf, date_format
 from pyspark.sql.types import FloatType
 from fifeforspark.base_modelers import default_subset_to_all, Modeler, SurvivalModeler
 
@@ -122,7 +122,7 @@ class LGBModeler(Modeler):
 
     def predict(
             self, subset: Union[None, pyspark.sql.column.Column] = None, cumulative: bool = True
-    ) -> np.ndarray:
+    ) -> pyspark.sql.DataFrame:
         """Use trained LightGBM models to predict the outcome for each observation and time horizon.
         Args:
             subset: A Boolean Spark Column that is True for observations for which
@@ -152,10 +152,15 @@ class LGBModeler(Modeler):
                                                          predictions[f'probability_{i}'])
         return predictions
 
-    def transform_features(self) -> pd.DataFrame:
+    def transform_features(self) -> pyspark.sql.DataFrame:
         """Transform features to suit model training."""
-        data = self.data.copy(deep=True)
-        # TODO: ADD FUNCTIONALItY
+        data = self.data
+        date_cols = [x for x, y in data.dtypes if y in ['DateType', 'Timestamp']]
+        for col in date_cols:
+            data = data.withColumn(col,
+                                   10000*date_format(data[col], "y") +
+                                   100*date_format(data[col], "m") +
+                                   date_format(data[col], "d"))
         return data
 
     def save_model(self, file_name: str = "GBT_Model", path: str = "") -> None:
