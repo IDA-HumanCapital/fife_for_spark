@@ -8,7 +8,8 @@ import pandas as pd
 import pyspark.sql
 from pyspark.ml import Pipeline
 from pyspark.ml.feature import VectorAssembler, StringIndexer
-
+from pyspark.sql.functions import udf
+from pyspark.sql.types import FloatType
 from fifeforspark.base_modelers import default_subset_to_all, Modeler, SurvivalModeler
 
 
@@ -131,21 +132,24 @@ class LGBModeler(Modeler):
                 If False, produce marginal survival probabilities (i.e., one
                 minus the hazard rate).
         Returns:
-            A numpy array of predictions by observation and lead
+            A dataframe of predictions by observation and lead
             length.
         """
         subset = default_subset_to_all(subset, self.data)
         predict_data = self.data.filter(subset)[self.categorical_features + self.numeric_features]
 
-        # This is a single node version of this. Eventually we may want to distribute the array
-        predictions = np.array(
-            [
-                [x[0][0] for x in list(lead_specific_model.transform(predict_data).select('probability').collect())]
-                for lead_specific_model in self.model
-            ]
-        ).T
-        if cumulative:
-            predictions = np.cumprod(predictions, axis=1)
+        firstelement = udf(lambda v: float(v[0]), FloatType())
+        first_model = self.model[0]
+        predictions = first_model.transform(predict_data).selectExpr('probability as probability_1')
+        predictions = predictions.withColumn('probability_1', firstelement(predictions['probability_1']))
+        for i, lead_specific_model in enumerate(self.model):
+            if i != 0:
+                predictions = predictions.withColumn(f'probability_{i+1}',
+                                                     firstelement(predictions[f'probability_{i+1}']))
+                if cumulative:
+                    predictions = predictions.withColumn(f'probability_{i + 1}',
+                                                         predictions[f'probability_{i + 1}'] *
+                                                         predictions[f'probability_{i}'])
         return predictions
 
     def transform_features(self) -> pd.DataFrame:
