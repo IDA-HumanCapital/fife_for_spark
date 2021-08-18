@@ -257,7 +257,8 @@ class Modeler(ABC):
         )
         subset = ~self.data[self.validation_col] & ~self.data[self.test_col] & ~self.data[self.predict_col]
         train_obs_by_lead_length = train_durations.filter(subset)
-        train_obs_by_lead_length = train_obs_by_lead_length.groupBy('max_durations').count()
+        train_obs_by_lead_length = train_obs_by_lead_length.groupBy(
+            'max_durations').count()
         n_intervals = train_obs_by_lead_length.filter(
             train_obs_by_lead_length['count'] > self.config.get(
                 "min_survivors_in_train", 64).alias('max_durations')).agg(
@@ -354,7 +355,8 @@ class SurvivalModeler(Modeler):
             metrics.append(
                 compute_metrics_for_binary_outcomes(
                     actuals,
-                    predictions.select(predictions[lead_length - 1]).limit(actuals.count()),
+                    predictions.select(
+                        predictions[lead_length - 1]).limit(actuals.count()),
                     threshold_positive=threshold_positive,
                     share_positive=share_positive,
                 )
