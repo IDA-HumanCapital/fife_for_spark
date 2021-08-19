@@ -1,31 +1,29 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import lit, when, monotonically_increasing_id
-import findspark
-import pyspark
-from pyspark.mllib.evaluation import BinaryClassificationMetrics
-from pyspark.sql.types import *
-import pandas as pd
-import numpy as np
-from lifelines.utils import concordance_index
 from abc import ABC, abstractmethod
 from typing import Union, Any
-import databricks.koalas as ks
 from collections import OrderedDict
+
+import pandas as pd
+import numpy as np
+import databricks.koalas as ks
+import findspark
+import pyspark.sql
+from pyspark.sql import SparkSession
+from pyspark.sql.types import DoubleType
+from pyspark.sql.functions import lit, when, monotonically_increasing_id
+from pyspark.mllib.evaluation import BinaryClassificationMetrics
+from lifelines.utils import concordance_index
 
 findspark.init()
 
 spark = SparkSession.builder.getOrCreate()
 
 
-def default_subset_to_all(
+def default_subset_to_all(    
     subset: Union[None, pd.core.series.Series], data: pyspark.sql.DataFrame
 ) -> pyspark.sql.DataFrame:
     """Map an unspecified subset to an entirely True boolean mask."""
     if subset is None:
-        data = data.withColumn('True_mask', lit(True))
-        subset = data.select(data['True_mask'])
-        data = data.drop('True mask')
-        return subset
+        return data.withColumn('True_mask', lit(True)).select('True_mask')
     return subset
 
 
@@ -55,7 +53,6 @@ def compute_metrics_for_binary_outcomes(
     mean_actual = actuals.agg({'actuals': 'mean'}).first()[0]
     metrics["Predicted Share"] = mean_predict
     metrics["Actual Share"] = mean_actual
-    # Checks if actuals doesn't have a single row, if so then it's not empty
     if actuals.first() is not None:
         if share_positive == 'predicted':
             share_positive = predictions.agg(
@@ -65,22 +62,14 @@ def compute_metrics_for_binary_outcomes(
                 'predictions', [1-share_positive], relativeError=.1)[0]
         elif threshold_positive == 'predicted':
             threshold_positive = mean_predict
-
+        
         preds_and_labs = preds_and_labs.withColumn('predictions', when(
             preds_and_labs.predictions >= threshold_positive, 1).otherwise(0))
-        TP = preds_and_labs.select(((preds_and_labs.predictions == 1) & (
-            preds_and_labs.actuals == 1)).cast('int').alias('TP')).agg({'TP': 'sum'}).first()[0]
-        TN = preds_and_labs.select(((preds_and_labs.predictions == 0) & (
-            preds_and_labs.actuals == 0)).cast('int').alias('TN')).agg({'TN': 'sum'}).first()[0]
-        FP = preds_and_labs.select(((preds_and_labs.predictions == 1) & (
-            preds_and_labs.actuals == 0)).cast('int').alias('FP')).agg({'FP': 'sum'}).first()[0]
-        FN = preds_and_labs.select(((preds_and_labs.predictions == 0) & (
-            preds_and_labs.actuals == 1)).cast('int').alias('FN')).agg({'FN': 'sum'}).first()[0]
-
-        metrics["True Positives"] = TP
-        metrics["False Negatives"] = FN
-        metrics["False Positives"] = FP
-        metrics["True Negatives"] = TN
+        
+        outcomes = {'True Positives': [1,1], 'False Negatives': [0,1], 'False Positives': [1,0], 'True Negatives': [0,0]}
+        for key in outcomes.keys():
+            metrics[key] = preds_and_labs.select(((preds_and_labs.predictions == outcomes[key][0]) & (
+                preds_and_labs.actuals == outcomes[key][1])).cast('int').alias('Outcome')).agg({'Outcome': 'sum'}).first()[0]
 
     return metrics
 
@@ -121,7 +110,7 @@ class Modeler(ABC):
     def __init__(
         self,
         config: Union[None, dict] = {},
-        data: Union[None, pd.core.frame.DataFrame] = None,
+        data: Union[None, pyspark.sql.DataFrame] = None,
         duration_col: str = "_duration",
         event_col: str = "_event_observed",
         predict_col: str = "_predict_obs",
@@ -219,7 +208,7 @@ class Modeler(ABC):
         subset: Union[None, pyspark.sql.column.Column] = None,
         threshold_positive: Union[None, str, float] = 0.5,
         share_positive: Union[None, str, float] = None,
-    ) -> ks.frame.DataFrame:
+    ) -> pd.core.frame.DataFrame:
         """Tabulate model performance metrics."""
 
     @abstractmethod
@@ -259,9 +248,11 @@ class Modeler(ABC):
         train_obs_by_lead_length = train_durations.filter(subset)
         train_obs_by_lead_length = train_obs_by_lead_length.groupBy(
             'max_durations').count()
-        n_intervals = train_obs_by_lead_length.filter(
+        min_survivors_subset = train_obs_by_lead_length.filter(
             train_obs_by_lead_length['count'] > self.config.get(
-                "min_survivors_in_train", 64).alias('max_durations')).agg(
+                "min_survivors_in_train", 64).alias('max_durations'))
+        assert min_survivors_subset.first() is not None, "No lead length has more than 64 survivors."
+        n_intervals = min_survivors_subset.agg(
             {'max_durations': 'max'}
         ).first()[0]
         return n_intervals
@@ -378,6 +369,7 @@ class SurvivalModeler(Modeler):
         return metrics
 
     def forecast(self) -> ks.DataFrame:
+        """Tabulate survival probabilities for most recent observations."""
         columns = [
             str(i + 1) + "-period Survival Probability" for i in range(self.n_intervals)]
         forecasts = self.predict(
