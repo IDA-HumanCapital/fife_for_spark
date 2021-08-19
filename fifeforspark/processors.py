@@ -91,7 +91,7 @@ class PanelDataProcessor(DataProcessor):
     """
 
     def __init__(self, config: Union[None, dict] = {},
-                 data: Union[None, pyspark.sql.DataFrame] = None,) -> None:
+                 data: Union[None, pyspark.sql.DataFrame] = None, shuffle_parts = 200) -> None:
         """Initialize the PanelDataProcessor.
         Args:
             config: A dictionary of configuration parameters.
@@ -105,6 +105,7 @@ class PanelDataProcessor(DataProcessor):
                 f'second-leftmost column ({config["time_identifier"]})'
             )
         super().__init__(config, data)
+        self.spark.conf.set("spark.sql.shuffle.partitions", shuffle_parts)
 
     def check_panel_consistency(self) -> None:
         """Ensure observations have unique individual-period combinations."""
