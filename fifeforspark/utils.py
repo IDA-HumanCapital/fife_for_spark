@@ -13,6 +13,7 @@ def create_example_data1(n_persons: int = 3, n_periods: int = 12
 ) -> pd.core.frame.DataFrame:
     """
     Create example data for testing FIFE
+
     Args:
         n_persons: the number of people to be in the dataset
         n_periods: the number of periods to be in the dataset
@@ -68,6 +69,7 @@ def create_example_data2(
 ) -> pd.core.frame.DataFrame:
     """
     Fabricate an unbalanced panel dataset suitable as FIFE input.
+
     Args:
         n_persons: the number of people to be in the dataset
         n_periods: the number of periods to be in the dataset
