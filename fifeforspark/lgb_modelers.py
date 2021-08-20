@@ -51,7 +51,15 @@ class LGBModeler(Modeler):
             n_intervals: Union[None, int] = None,
             params: dict = None
     ) -> None:
-        """Train and store a sequence of gradient-boosted tree models."""
+        """
+        Train and store a sequence of gradient-boosted tree models.
+        Args:
+            n_intervals: the maximum periods ahead the model will predict.
+            params: Parameters for model tuning
+
+        Returns:
+            None
+        """
         if n_intervals:
             self.n_intervals = n_intervals
         else:
@@ -65,7 +73,15 @@ class LGBModeler(Modeler):
             params: Union[None, dict] = None,
             subset: Union[None, pyspark.sql.column.Column] = None
     ) -> List[pyspark.ml.pipeline.PipelineModel]:
-        """Train a LightGBM model for each lead length."""
+        """
+        Train a LightGBM model for each lead length.
+        Args:
+            params: Parameters for model tuning
+            subset: Boolean column for subsetting the data
+
+        Returns:
+            List of Pyspark ML Pipeline models
+        """
         models = []
 
         for time_horizon in range(self.n_intervals):
@@ -84,7 +100,16 @@ class LGBModeler(Modeler):
             params: Union[None, dict] = None,
             subset: Union[None, pyspark.sql.column.Column] = None
     ) -> pyspark.ml.pipeline.PipelineModel:
-        """Train a LightGBM model for a single lead length."""
+        """
+        Train a LightGBM model for a single lead length.
+        Args:
+            time_horizon: The number of periods out for which to build this model
+            params: Parameters for model tuning
+            subset: Boolean column for subsetting the data
+
+        Returns:
+            Single ML Pipeline model
+        """
         if params is None:
             params = {
                 time_horizon: {
@@ -125,7 +150,7 @@ class LGBModeler(Modeler):
             subset: A Boolean Spark Column that is True for observations for which
                 predictions will be produced. If None, default to all
                 observations.
-            cumulative: If True, produce cumulative survival probabilies.
+            cumulative: If True, produce cumulative survival probabilities.
                 If False, produce marginal survival probabilities (i.e., one
                 minus the hazard rate).
         Returns:
@@ -152,7 +177,11 @@ class LGBModeler(Modeler):
         return predictions
 
     def transform_features(self) -> pyspark.sql.DataFrame:
-        """Transform features to suit model training."""
+        """
+        Transform datetime features to suit model training.
+        Returns:
+            Spark DataFrame with transformed features
+        """
         data = self.data
         date_cols = [x for x, y in data.dtypes if y in ['date', 'timestamp']]
         for col in date_cols:
@@ -163,8 +192,15 @@ class LGBModeler(Modeler):
         return data
 
     def save_model(self, file_name: str = "GBT_Model", path: str = "") -> None:
-        """Save the horizon-specific LightGBM models that comprise the model to disk.
+        """
+        Save the horizon-specific LightGBM models that comprise the model to disk.
         Functionality does not currently exist
+        Args:
+            file_name: The desired name of the model on disk
+            path: The path for where to save the model
+
+        Returns:
+            None
         """
         pass
 
