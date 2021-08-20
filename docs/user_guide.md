@@ -180,8 +180,6 @@ Using this data, we may want answers about which individuals will still be in th
 
 FIFE can estimate answers to these questions for any unbalanced panel dataset.
 
-## Survival Analysis
-
 Survival analysis was first used to determine if someone lived or died. Today, however, we can use its theories to define exits from a binary state as either a _life_ or _death_. For instance, we can investigate if an individual leaves the military service by asking if this individual "dies." If another individual joins the service, we can say they were "born."
 
 We can use these ideas to define retention as "living" and attrition as "dying." To investigate retention, FIFE seeks forecasts for observations in the final period of the dataset. For each observation, we define “retention” as the observation of the  same subject in a given number of consecutive future periods. For example, 2-year retention of a subject observed in 2019 means observing the same subject in 2020 and 2021. Note that we define  retention with reference to the time of observation. We ask not “will this individual be in the dataset in 2 years,” but “will this member be in this dataset 2 more years from this date?”
@@ -226,7 +224,7 @@ The problem is the Kaplan-Meier estimation to the survival curve, and the result
 
 Another method to account for :math:`x` is to apply the Kaplan-Meier estimator separately for each unique value of :math:`x`. We can describe this method as :math:`h(t,x)=h_{x}(t)`. This method is only as useful as the number of observations with each unique value. For example, because there are thousands of active duty service members in each service in each year, this method would be  useful to estimate a separate hazard function for each service. We could also estimate a separate hazard function for each combination of service and entry year. However, we would be limiting :math:`x` to contain the values of only two features. We could not use this method to estimate a separate hazard function for each combination of  feature values among the hundreds of features in our data. Even a single feature with continuous support, such as the amount a member commits to their Thrift Savings Plan (TSP), makes this method infeasible.
 
-## FIFE: Using Machine Learning
+### FIFE: Using Machine Learning
 
 With FIFE, we can use machine learning to consider the interactions of feature values in predicting whether an individual will stay or leave. Traditional methods in the domain of survival analysis effectively consider all forecastable future time horizons by expressing the probability of retention as a continuous function of time since observation. In the case of panel data,  however, all forecastable time horizons fall in a discrete domain with a finite number of intervals. We can, therefore, consider each forecastable time horizon separately rather than treating time as continuous, unlocking all manner of forecasting methods not designed for survival analysis, including state-of-the-art machine learning methods.
 
@@ -236,7 +234,7 @@ For each :math:`t`, we fit :math:`h_{t}(x)` to observations of the feature vecto
 
 Like the Kaplan-Meier estimator, our method addresses censoring by  considering only observations for which we observe exit or survival at the given time horizon. In other words, we address censoring by subsetting the data for each :math:`t`. The panel nature of the data make this subsetting simple: if there are :math:`T` periods in the data, only observations from the earliest :math:`T−t` periods allow us to observe exit or survival :math:`t` periods ahead. For example, suppose we have annual observations from 2000 through 2019 available for model fitting. Let our time horizon be four years. We exclude the most recent four years, leaving observations from 2000 through 2015. Among those observations, we keep only those retained at least three years from the time of observation. Then we compute the binary outcome of survival or exit four years from the time of observation. This estimation actually looks at one minus the hazard, which leaves survival as a positive class. 
 
-### Gradient-Boosted Trees
+#### Gradient-Boosted Trees
 
 Gradient-boosted trees are a state-of-the-art machine learning algorithm for binary classification and regression. A gradient-boosted trees model is a sequence of **decision trees**. Each decision tree repeatedly sorts observations based on a binary condition. For example, a decision tree for predicting one-year Army officer retention could first sort observations into those with fewer than six  years of service and those with six or more. Then it could sort the former subgroup into those who accessed through the Unites States Military Academy and those who accessed otherwise. The tree could sort the subgroup with six or more years of service into those who are in the Infantry Branch or Field Artillery Branch and those who are not. The tree could continue to sort each subgroup until reaching some stopping criterion. Any given observation sorts into one of the resulting subgroups (**leaves**), and is assigned the predicted value associated with that leaf.
 
