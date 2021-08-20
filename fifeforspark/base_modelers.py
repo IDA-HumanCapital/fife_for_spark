@@ -21,7 +21,17 @@ spark = SparkSession.builder.getOrCreate()
 def default_subset_to_all(    
     subset: Union[None, pd.core.series.Series], data: pyspark.sql.DataFrame
 ) -> pyspark.sql.DataFrame:
-    """Map an unspecified subset to an entirely True boolean mask."""
+    """
+    Map an unspecified subset to an entirely True boolean mask.
+
+    Args:
+        subset: the subset passed into the data (boolean column) if it exists
+        data: the original dataset
+
+    Returns:
+        Original subset argument if not none, otherwise a new boolean mask that is always True.
+    """
+
     if subset is None:
         return data.withColumn('True_mask', lit(True)).select('True_mask')
     return subset
@@ -31,6 +41,18 @@ def compute_metrics_for_binary_outcomes(
     actuals: pyspark.sql.DataFrame, predictions: pyspark.sql.DataFrame,
     threshold_positive: Union[None, str, float] = 0.5, share_positive: Union[None, str, float] = None
 ) -> OrderedDict:
+    """
+    Function to compute performance metrics for binary classification models
+
+    Args:
+        actuals: The actual values
+        predictions: The predicted values
+        threshold_positive: The threshold for determining whether a value is predicted True or False
+        share_positive: The share of values that you want to classify as positive
+
+    Returns:
+        Ordered dictionary with evaluation metrics
+    """
     actuals = actuals.select(actuals['actuals'].cast(DoubleType()))
     num_true = actuals.agg({'actuals': 'sum'}).first()[0]
     total = actuals.count()
@@ -194,13 +216,27 @@ class Modeler(ABC):
 
     @abstractmethod
     def train(self) -> Any:
-        """Train and return a model."""
+        """
+        Train and return a model.
+
+        Returns:
+            Any
+        """
 
     @abstractmethod
     def predict(
         self, subset: Union[None, pyspark.sql.column.Column] = None, cumulative: bool = True
-    ) -> np.ndarray:
-        """Use trained model to produce observation survival probabilities."""
+    ) -> pyspark.sql.DataFrame:
+        """
+        Use trained model to produce observation survival probabilities.
+
+        Args:
+            subset: The subset of values to predict on
+            cumulative: Flag for whether output probabilities should be cumulative
+
+        Returns:
+            Spark dataframe with prediction results
+        """
 
     @abstractmethod
     def evaluate(
@@ -209,36 +245,94 @@ class Modeler(ABC):
         threshold_positive: Union[None, str, float] = 0.5,
         share_positive: Union[None, str, float] = None,
     ) -> pd.core.frame.DataFrame:
-        """Tabulate model performance metrics."""
+        """
+        Tabulate model performance metrics.
+
+        Args:
+            subset: The subset of values to evaluate
+            threshold_positive: The threshold value for determining whether a value is positive or negative
+            share_positive: The share you want to classify as positive
+
+        Returns:
+            Pandas Dataframe with evaluation results
+        """
 
     @abstractmethod
     def forecast(self) -> pyspark.sql.DataFrame:
-        """Tabulate survival probabilities for most recent observations."""
+        """
+        Tabulate survival probabilities for most recent observations.
+
+        Returns:
+            Spark DataFrame with forecast results
+        """
 
     @abstractmethod
     def subset_for_training_horizon(
         self, data: pyspark.sql.DataFrame, time_horizon: int
     ) -> pyspark.sql.DataFrame:
-        """Return only observations where the outcome is observed."""
+        """
+        Return only observations where the outcome is observed.
+
+        Args:
+            data: Dataset to train on
+            time_horizon: the number of periods for which you're forecasting (i.e. 2 periods out)
+
+        Returns:
+            Spark DataFrame with original dataset subsetted
+        """
 
     @abstractmethod
     def label_data(self, time_horizon: int) -> pyspark.sql.DataFrame:
-        """Return data with an outcome label for each observation."""
+        """
+        Return data with an outcome label for each observation.
+
+        Args:
+            time_horizon: the number of periods for which you're forecasting (i.e. 2 periods out)
+
+        Returns:
+            Data with outcome label added based on time_horizon
+        """
 
     @abstractmethod
     def save_model(self, path: str = "") -> None:
-        """Save model file(s) to disk."""
+        """
+        Save model file(s) to disk.
+
+        Args:
+            path: Path to save model
+
+        Returns:
+            None
+        """
 
     @abstractmethod
     def transform_features(self) -> pyspark.sql.DataFrame:
-        """Transform datetime features to suit model training."""
+        """
+        Transform datetime features to suit model training.
+
+        Returns:
+            Spark DataFrame with transformed features
+        """
 
     @abstractmethod
     def build_model(self, n_intervals: Union[None, int] = None) -> None:
-        """Configure, train, and store a model."""
+        """
+        Configure, train, and store a model.
+
+        Args:
+            n_intervals: the maximum periods ahead the model will predict.
+
+        Returns:
+            None
+        """
 
     def set_n_intervals(self) -> int:
-        """Determine the maximum periods ahead the model will predict."""
+        """
+        Determine the maximum periods ahead the model will predict.
+
+        Returns:
+            n_intervals (the maximum periods ahead the model will predict)
+        """
         train_durations = self.data.select(
             when(
                 self.data[self.duration_col] <= self.data[self.max_lead_col], self.data[self.duration_col]
@@ -293,7 +387,9 @@ class SurvivalModeler(Modeler):
     """
 
     def __init__(self, **kwargs):
-        """Initialize the SurvivalModeler.
+        """
+        Initialize the SurvivalModeler.
+
         Args:
             **kwargs: Arguments to Modeler.__init__().
         """
@@ -307,7 +403,9 @@ class SurvivalModeler(Modeler):
         threshold_positive: Union[None, str, float] = 0.5,
         share_positive: Union[None, str, float] = None,
     ) -> pd.core.frame.DataFrame:
-        """Tabulate model performance metrics.
+        """
+        Tabulate model performance metrics.
+
         Args:
             subset: A Boolean Series that is True for observations over which
                 the metrics will be computed. If None, default to all test
@@ -369,7 +467,12 @@ class SurvivalModeler(Modeler):
         return metrics
 
     def forecast(self) -> ks.DataFrame:
-        """Tabulate survival probabilities for most recent observations."""
+        """
+        Tabulate survival probabilities for most recent observations.
+
+        Returns:
+            Spark DataFrame with forecast results
+        """
         columns = [
             str(i + 1) + "-period Survival Probability" for i in range(self.n_intervals)]
         forecasts = self.predict(
@@ -382,13 +485,30 @@ class SurvivalModeler(Modeler):
         return forecasts
 
     def subset_for_training_horizon(self, data: pyspark.sql.DataFrame, time_horizon: int) -> pyspark.sql.DataFrame:
-        """Return only observations where survival would be observed."""
+        """
+        Return only observations where the outcome is observed.
+
+        Args:
+            data: Dataset to train on
+            time_horizon: the number of periods for which you're forecasting (i.e. 2 periods out)
+
+        Returns:
+            Spark DataFrame with original dataset subsetted
+        """
         if self.allow_gaps:
             return data.filter(data[self.max_lead_col] > time_horizon)
         return data.filter((data[self.duration_col] + data[self.event_col]).cast('int') > time_horizon)
 
     def label_data(self, time_horizon: int) -> pyspark.sql.DataFrame:
-        """Return data with an indicator for survival for each observation."""
+        """
+        Return data with an outcome label for each observation.
+
+        Args:
+            time_horizon: the number of periods for which you're forecasting (i.e. 2 periods out)
+
+        Returns:
+            Data with outcome label added based on time_horizon
+        """
         # Spark automatically creates a copy when setting one value equal to another, different from python
         spark_df = self.data
         spark_df = spark_df.withColumn(spark_df[self.duration_col], when(
@@ -412,6 +532,7 @@ class SurvivalModeler(Modeler):
         else:
             spark_df.withColumn(
                 '_label', spark_df[self.duration_col] > lit(time_horizon))
+        return spark_df
 
 
 class StateModeler(Modeler):

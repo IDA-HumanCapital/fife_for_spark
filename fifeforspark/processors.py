@@ -15,9 +15,11 @@ class DataProcessor:
 
     def __init__(self, config={}, data=None) -> None:
         """Initialize the DataProcessor.
+
         Args:
             config: A dictionary of configuration parameters.
             data: A DataFrame to be processed.
+
         """
         findspark.init()
         self.spark = SparkSession.builder.getOrCreate()
@@ -31,7 +33,15 @@ class DataProcessor:
         self.data = data
 
     def check_column_consistency(self, colname: str) -> None:
-        """Assert column exists, has no missing values, and is not constant."""
+        """
+        Assert column exists, has no missing values, and is not constant.
+
+        Args:
+            colname: The name of the column to check
+
+        Returns:
+            None
+        """
         assert colname in self.data.columns, f"{colname} not in data"
         assert self.data.select(
             isnan(colname).cast('int').alias(colname)
@@ -40,7 +50,15 @@ class DataProcessor:
             colname).distinct().count() >= 2, f"{colname} does not have multiple unique values"
 
     def is_degenerate(self, col: str) -> bool:
-        """Determine if a feature is constant or has too many missing values."""
+        """
+        Determine if a feature is constant or has too many missing values
+
+        Args:
+            col: The column/feature to check
+
+        Returns:
+            Boolean value for whether the column is degenerate
+        """
         if self.data.select(
                 isnan(col).cast('integer').alias(col)
         ).agg({col: 'mean'}).first()[0] >= self.config.get('max_null_share', 0.999):
@@ -50,7 +68,15 @@ class DataProcessor:
         return False
 
     def is_categorical(self, col: str) -> bool:
-        """Determine if the given feature should be processed as categorical, as opposed to numeric."""
+        """
+        Determine if the given feature should be processed as categorical, as opposed to numeric.
+
+        Args:
+            col: The column to check
+
+        Returns:
+            Boolean value for whether the column is categorical
+        """
         if col.endswith(self.config.get('categorical_suffixes', ())):
             if col.endswith(self.config.get('numerical_suffixes', ())):
                 print(
@@ -93,6 +119,7 @@ class PanelDataProcessor(DataProcessor):
     def __init__(self, config: Union[None, dict] = {},
                  data: Union[None, pyspark.sql.DataFrame] = None, shuffle_parts = 200) -> None:
         """Initialize the PanelDataProcessor.
+
         Args:
             config: A dictionary of configuration parameters.
             data: A DataFrame to be processed.
@@ -108,7 +135,12 @@ class PanelDataProcessor(DataProcessor):
         self.spark.conf.set("spark.sql.shuffle.partitions", shuffle_parts)
 
     def check_panel_consistency(self) -> None:
-        """Ensure observations have unique individual-period combinations."""
+        """
+        Ensure observations have unique individual-period combinations.
+
+        Returns:
+            None
+        """
         self.check_column_consistency(self.config['individual_identifier'])
         self.check_column_consistency(self.config['time_identifier'])
         subset = self.data.select(
@@ -116,8 +148,16 @@ class PanelDataProcessor(DataProcessor):
         assert subset.count() == subset.dropDuplicates().count(
         ), "One or more individuals have multiple observations for a single time value."
 
-    def process_single_column(self, colname):
-        """Apply data cleaning functions to a singular data column."""
+    def process_single_column(self, colname) -> pyspark.sql.DataFrame:
+        """
+        Apply data cleaning functions to a singular data column.
+
+        Args:
+            colname: The column to process
+
+        Returns:
+            Dataframe: dataframe with the processed column
+        """
         if colname == self.config['individual_identifier']:
             return self.data
         if self.is_degenerate(col=colname):
@@ -128,16 +168,24 @@ class PanelDataProcessor(DataProcessor):
             self.data = self.data.fillna('NaN', subset=[colname])
         return self.data
 
-    def process_all_columns(self, indiv_id: str = None) -> pyspark.sql.DataFrame:
-        """Apply data cleaning functions to all data columns."""
+    def process_all_columns(self) -> pyspark.sql.DataFrame:
+        """
+        Apply data cleaning functions to all data columns.
+
+        Returns:
+            Spark DataFrame with processed columns
+        """
         for col_name in self.data.columns:
             self.data = self.process_single_column(colname=col_name)
         return self.data
 
-    def flag_validation_individuals(
-            self, individual_identifier: 'str', validation_share: float = 0.25
-    ) -> pyspark.sql.DataFrame:
-        """Flag observations from a random share of individuals."""
+    def flag_validation_individuals(self) -> pyspark.sql.DataFrame:
+        """
+        Flag observations from a random share of individuals.
+
+        Returns:
+            Spark DataFrame with flagged validation individuals
+        """
         unique_ids = self.data.select(
             self.config['individual_identifier']).distinct()
         total = unique_ids.count()
@@ -150,8 +198,14 @@ class PanelDataProcessor(DataProcessor):
             'val_flagged', self.data[self.config['individual_identifier']].isin(unique_list))
         return self.data
 
-    def build_reserved_cols(self):
-        """Add data split and outcome-related columns to the data."""
+    def build_reserved_cols(self) -> pyspark.sql.DataFrame:
+        """
+        Add data split and outcome-related columns to the data.
+
+        Returns:
+            Spark DataFrame with reserved columns added
+        """
+
         ks_df = ks.DataFrame(self.data)
         ks_df['_period'] = ks_df[self.config['time_identifier']].factorize(sort=True)[
             0]
@@ -172,8 +226,7 @@ class PanelDataProcessor(DataProcessor):
         self.data = self.data.withColumn(
             '_test', (self.data['_period'] + self.config.get('test_intervals', 0)) >= max_val)
 
-        self.data = self.flag_validation_individuals(
-            self.data, self.config['individual_identifier'])
+        self.data = self.flag_validation_individuals()
         self.data = self.data.withColumn(
             '_validation', ~self.data['_test'] & self.data['val_flagged'])
 
@@ -214,14 +267,26 @@ class PanelDataProcessor(DataProcessor):
         self.data = self.data.drop('gaps')
         self.data = self.data.drop('val_flagged')
         self.data = self.data.drop('Obs_max_period')
-        return(self.data)
+        return self.data
 
     def sort_panel_data(self) -> pyspark.sql.DataFrame:
-        """Sort the data by individual, then by period."""
-        return(self.data.orderBy(F.asc(self.config['individual_identifier']), F.asc('_period')))
+        """
+        Sort the data by individual, then by period.
+
+        Returns:
+            Sorted panel data
+        """
+
+        return self.data.orderBy(F.asc(self.config['individual_identifier']), F.asc('_period'))
 
     def build_processed_data(self):
-        """Clean, augment, and store a panel dataset and related information."""
+        """
+        Clean, augment, and store a panel dataset and related information.
+
+        Returns:
+            Processed data
+        """
+
         self.data.cache()
         self.check_panel_consistency()
         self.data = self.process_all_columns()
