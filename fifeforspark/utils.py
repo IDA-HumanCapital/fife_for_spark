@@ -161,6 +161,11 @@ class FIFEArgParser(argparse.ArgumentParser):
             help="The share of observations used for evaluation instead of training for hyperoptimization or early stopping.",
         )
         self.add_argument(
+            "--max_epochs",
+            type=int,
+            help="If HYPER_TRIALS is zero, the maximum number of passes through the training set.",
+        )
+        self.add_argument(
             "--min_survivors_in_train",
             type=int,
             help="The minimum number of training set observations surviving a given time horizon for the model to be trained to make predictions for that time horizon.",
