@@ -4,6 +4,7 @@ import processors, utils
 def parse_config() -> dict:
     """
     Parse configuration parameters specified in the command line.
+
     Returns:
         Configuration dictionary generated from the command line input
     """
@@ -18,8 +19,9 @@ def parse_config() -> dict:
 def main():
     """
     Executable code of FIFE when run from the command line
-    Returns:
 
+    Returns:
+        None
     """
     config = parse_config()
     spark_df = utils.create_example_data2(n_persons = 100, n_periods = 12)
