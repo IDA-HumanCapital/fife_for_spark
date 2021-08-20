@@ -10,6 +10,15 @@ import argparse
 
 def create_example_data1(n_persons: int = 3, n_periods: int = 12
 ) -> pd.core.frame.DataFrame:
+    """
+    Create example data for testing FIFE
+    Args:
+        n_persons: the number of people to be in the dataset
+        n_periods: the number of periods to be in the dataset
+
+    Returns:
+        Spark dataframe with example data
+    """
     findspark.init()
     sc = SparkSession.builder.getOrCreate()
     schema = StructType([
@@ -51,12 +60,21 @@ def create_example_data1(n_persons: int = 3, n_periods: int = 12
                             del x_4_transition_value
                     period += 1
     values = values.withColumn('feature_5', values.feature_2)
-    return(values)
+    return values
 
 def create_example_data2(
     n_persons: int = 8192, n_periods: int = 20
 ) -> pd.core.frame.DataFrame:
-    """Fabricate an unbalanced panel dataset suitable as FIFE input."""
+    """
+    Fabricate an unbalanced panel dataset suitable as FIFE input.
+    Args:
+        n_persons: the number of people to be in the dataset
+        n_periods: the number of periods to be in the dataset
+
+    Returns:
+        Spark dataframe with example data
+
+    """
     findspark.init()
     sc = SparkSession.builder.getOrCreate()
     seed = 9999
