@@ -1,4 +1,4 @@
-import processors, utils, lgb_modelers
+from fifeforspark import processors, utils, lgb_modelers
 from time import time
 
 def parse_config() -> dict:
