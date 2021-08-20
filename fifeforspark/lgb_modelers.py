@@ -63,8 +63,7 @@ class LGBModeler(Modeler):
     def train(
             self,
             params: Union[None, dict] = None,
-            subset: Union[None, pyspark.sql.column.Column] = None,
-            validation_early_stopping: bool = True,
+            subset: Union[None, pyspark.sql.column.Column] = None
     ) -> List[pyspark.ml.pipeline.PipelineModel]:
         """Train a LightGBM model for each lead length."""
         models = []
