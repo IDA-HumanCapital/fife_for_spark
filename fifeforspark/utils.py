@@ -10,7 +10,7 @@ import argparse
 
 
 def create_example_data1(n_persons: int = 3, n_periods: int = 12
-) -> pd.core.frame.DataFrame:
+) -> pyspark.sql.DataFrame:
     """
     Create example data for testing FIFE
 
@@ -66,7 +66,7 @@ def create_example_data1(n_persons: int = 3, n_periods: int = 12
 
 def create_example_data2(
     n_persons: int = 8192, n_periods: int = 20
-) -> pd.core.frame.DataFrame:
+) -> pyspark.sql.DataFrame:
     """
     Fabricate an unbalanced panel dataset suitable as FIFE input.
 
