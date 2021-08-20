@@ -15,9 +15,11 @@ class DataProcessor:
 
     def __init__(self, config={}, data=None) -> None:
         """Initialize the DataProcessor.
+
         Args:
             config: A dictionary of configuration parameters.
             data: A DataFrame to be processed.
+
         """
         findspark.init()
         self.spark = SparkSession.builder.getOrCreate()
@@ -33,6 +35,7 @@ class DataProcessor:
     def check_column_consistency(self, colname: str) -> None:
         """
         Assert column exists, has no missing values, and is not constant.
+
         Args:
             colname: The name of the column to check
 
@@ -49,6 +52,7 @@ class DataProcessor:
     def is_degenerate(self, col: str) -> bool:
         """
         Determine if a feature is constant or has too many missing values
+
         Args:
             col: The column/feature to check
 
@@ -66,6 +70,7 @@ class DataProcessor:
     def is_categorical(self, col: str) -> bool:
         """
         Determine if the given feature should be processed as categorical, as opposed to numeric.
+
         Args:
             col: The column to check
 
@@ -114,6 +119,7 @@ class PanelDataProcessor(DataProcessor):
     def __init__(self, config: Union[None, dict] = {},
                  data: Union[None, pyspark.sql.DataFrame] = None, shuffle_parts = 200) -> None:
         """Initialize the PanelDataProcessor.
+
         Args:
             config: A dictionary of configuration parameters.
             data: A DataFrame to be processed.
@@ -131,6 +137,7 @@ class PanelDataProcessor(DataProcessor):
     def check_panel_consistency(self) -> None:
         """
         Ensure observations have unique individual-period combinations.
+
         Returns:
             None
         """
@@ -144,6 +151,7 @@ class PanelDataProcessor(DataProcessor):
     def process_single_column(self, colname) -> pyspark.sql.DataFrame:
         """
         Apply data cleaning functions to a singular data column.
+
         Args:
             colname: The column to process
 
@@ -174,6 +182,7 @@ class PanelDataProcessor(DataProcessor):
     def flag_validation_individuals(self) -> pyspark.sql.DataFrame:
         """
         Flag observations from a random share of individuals.
+
         Returns:
             Spark DataFrame with flagged validation individuals
         """
@@ -192,6 +201,7 @@ class PanelDataProcessor(DataProcessor):
     def build_reserved_cols(self) -> pyspark.sql.DataFrame:
         """
         Add data split and outcome-related columns to the data.
+
         Returns:
             Spark DataFrame with reserved columns added
         """
@@ -262,6 +272,7 @@ class PanelDataProcessor(DataProcessor):
     def sort_panel_data(self) -> pyspark.sql.DataFrame:
         """
         Sort the data by individual, then by period.
+
         Returns:
             Sorted panel data
         """
@@ -271,6 +282,7 @@ class PanelDataProcessor(DataProcessor):
     def build_processed_data(self):
         """
         Clean, augment, and store a panel dataset and related information.
+
         Returns:
             Processed data
         """
