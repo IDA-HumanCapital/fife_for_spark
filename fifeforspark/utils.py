@@ -159,3 +159,8 @@ class FIFEArgParser(argparse.ArgumentParser):
             type=float,
             help="The share of observations used for evaluation instead of training for hyperoptimization or early stopping.",
         )
+        self.add_argument(
+            "--max_epochs",
+            type=int,
+            help="If HYPER_TRIALS is zero, the maximum number of passes through the training set.",
+        )
