@@ -19,25 +19,12 @@ Python User Guide
 -----------------
 
 .. toctree::
-    :maxdepth: 1
-    :caption: Python User Guide
+   :maxdepth: 2
 
-    quick_start
-    introduction_survival_analysis
-    config_parameters
-    faq
-
-.. toctree::
-    :maxdepth: 2
-    :caption: Command Line Interface
-
-    cli_link
-
-.. toctree::
-    :maxdepth: 1
-    :caption: Modules
-
-    Modules <source/fifeforspark>
+   user_guide
+   cli_link
+   
+   Modules <source/fife>
 
 Project Information
 ===================
