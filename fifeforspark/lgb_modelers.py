@@ -152,7 +152,7 @@ class LGBModeler(Modeler):
     def transform_features(self) -> pyspark.sql.DataFrame:
         """Transform features to suit model training."""
         data = self.data
-        date_cols = [x for x, y in data.dtypes if y in ['DateType', 'Timestamp']]
+        date_cols = [x for x, y in data.dtypes if y in ['date', 'timestamp']]
         for col in date_cols:
             data = data.withColumn(col,
                                    10000*date_format(data[col], "y") +
