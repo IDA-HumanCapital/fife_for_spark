@@ -20,7 +20,6 @@ def create_example_data1(n_persons: int = 3, n_periods: int = 12
     Returns:
         Spark dataframe with example data
     """
-) -> pyspark.sql.DataFrame:
     findspark.init()
     spark = SparkSession.builder.getOrCreate()
     schema = StructType([
@@ -77,8 +76,6 @@ def create_example_data2(
         Spark dataframe with example data
 
     """
-) -> pyspark.sql.DataFrame:
-    """Fabricate an unbalanced panel dataset suitable as FIFE input."""
     findspark.init()
     spark = SparkSession.builder.getOrCreate()
     seed = 9999
