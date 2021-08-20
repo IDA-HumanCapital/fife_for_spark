@@ -89,7 +89,7 @@ class LGBModeler(Modeler):
             params = {
                 time_horizon: {
                     "objective": self.objective,
-                    "num_iterations": self.config.get("MAX_EPOCHS", 256),
+                    "num_iterations": self.config.get("max_epochs", 256),
                 }
             }
         params[time_horizon]["num_class"] = self.num_class
