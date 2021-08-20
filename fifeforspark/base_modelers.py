@@ -23,6 +23,7 @@ def default_subset_to_all(
 ) -> pyspark.sql.DataFrame:
     """
     Map an unspecified subset to an entirely True boolean mask.
+
     Args:
         subset: the subset passed into the data (boolean column) if it exists
         data: the original dataset
@@ -42,6 +43,7 @@ def compute_metrics_for_binary_outcomes(
 ) -> OrderedDict:
     """
     Function to compute performance metrics for binary classification models
+
     Args:
         actuals: The actual values
         predictions: The predicted values
@@ -216,6 +218,7 @@ class Modeler(ABC):
     def train(self) -> Any:
         """
         Train and return a model.
+
         Returns:
             Any
         """
@@ -226,6 +229,7 @@ class Modeler(ABC):
     ) -> pyspark.sql.DataFrame:
         """
         Use trained model to produce observation survival probabilities.
+
         Args:
             subset: The subset of values to predict on
             cumulative: Flag for whether output probabilities should be cumulative
@@ -243,6 +247,7 @@ class Modeler(ABC):
     ) -> pd.core.frame.DataFrame:
         """
         Tabulate model performance metrics.
+
         Args:
             subset: The subset of values to evaluate
             threshold_positive: The threshold value for determining whether a value is positive or negative
@@ -256,6 +261,7 @@ class Modeler(ABC):
     def forecast(self) -> pyspark.sql.DataFrame:
         """
         Tabulate survival probabilities for most recent observations.
+
         Returns:
             Spark DataFrame with forecast results
         """
@@ -266,6 +272,7 @@ class Modeler(ABC):
     ) -> pyspark.sql.DataFrame:
         """
         Return only observations where the outcome is observed.
+
         Args:
             data: Dataset to train on
             time_horizon: the number of periods for which you're forecasting (i.e. 2 periods out)
@@ -278,6 +285,7 @@ class Modeler(ABC):
     def label_data(self, time_horizon: int) -> pyspark.sql.DataFrame:
         """
         Return data with an outcome label for each observation.
+
         Args:
             time_horizon: the number of periods for which you're forecasting (i.e. 2 periods out)
 
@@ -289,6 +297,7 @@ class Modeler(ABC):
     def save_model(self, path: str = "") -> None:
         """
         Save model file(s) to disk.
+
         Args:
             path: Path to save model
 
@@ -300,6 +309,7 @@ class Modeler(ABC):
     def transform_features(self) -> pyspark.sql.DataFrame:
         """
         Transform datetime features to suit model training.
+
         Returns:
             Spark DataFrame with transformed features
         """
@@ -308,6 +318,7 @@ class Modeler(ABC):
     def build_model(self, n_intervals: Union[None, int] = None) -> None:
         """
         Configure, train, and store a model.
+
         Args:
             n_intervals: the maximum periods ahead the model will predict.
 
@@ -318,6 +329,7 @@ class Modeler(ABC):
     def set_n_intervals(self) -> int:
         """
         Determine the maximum periods ahead the model will predict.
+
         Returns:
             n_intervals (the maximum periods ahead the model will predict)
         """
@@ -375,7 +387,9 @@ class SurvivalModeler(Modeler):
     """
 
     def __init__(self, **kwargs):
-        """Initialize the SurvivalModeler.
+        """
+        Initialize the SurvivalModeler.
+
         Args:
             **kwargs: Arguments to Modeler.__init__().
         """
@@ -389,7 +403,9 @@ class SurvivalModeler(Modeler):
         threshold_positive: Union[None, str, float] = 0.5,
         share_positive: Union[None, str, float] = None,
     ) -> pd.core.frame.DataFrame:
-        """Tabulate model performance metrics.
+        """
+        Tabulate model performance metrics.
+
         Args:
             subset: A Boolean Series that is True for observations over which
                 the metrics will be computed. If None, default to all test
@@ -453,6 +469,7 @@ class SurvivalModeler(Modeler):
     def forecast(self) -> ks.DataFrame:
         """
         Tabulate survival probabilities for most recent observations.
+
         Returns:
             Spark DataFrame with forecast results
         """
@@ -470,6 +487,7 @@ class SurvivalModeler(Modeler):
     def subset_for_training_horizon(self, data: pyspark.sql.DataFrame, time_horizon: int) -> pyspark.sql.DataFrame:
         """
         Return only observations where the outcome is observed.
+
         Args:
             data: Dataset to train on
             time_horizon: the number of periods for which you're forecasting (i.e. 2 periods out)
@@ -484,6 +502,7 @@ class SurvivalModeler(Modeler):
     def label_data(self, time_horizon: int) -> pyspark.sql.DataFrame:
         """
         Return data with an outcome label for each observation.
+
         Args:
             time_horizon: the number of periods for which you're forecasting (i.e. 2 periods out)
 
