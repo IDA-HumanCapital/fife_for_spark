@@ -22,9 +22,9 @@ Python User Guide
    :maxdepth: 2
 
    user_guide
-   cli_link
+   cli
    
-   Modules <source/fife>
+   Modules <source/fifeforspark>
 
 Project Information
 ===================
@@ -59,7 +59,7 @@ BibTex:
 Contributing
 -------------
 
-To contribute to FIFE please contact us at humancapital@ida.org and/or open a pull request at https://github.com/IDA-HumanCapital/fife.
+To contribute to FIFEforSpark please contact us at humancapital@ida.org and/or open a pull request at https://github.com/IDA-HumanCapital/fifeforspark.
 
 Contact Information
 --------------------
