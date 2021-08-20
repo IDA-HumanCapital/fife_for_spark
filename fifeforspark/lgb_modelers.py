@@ -156,7 +156,7 @@ class LGBModeler(Modeler):
         for col in date_cols:
             data = data.withColumn(col,
                                    10000*date_format(data[col], "y") +
-                                   100*date_format(data[col], "m") +
+                                   100*date_format(data[col], "M") +
                                    date_format(data[col], "d"))
         return data
 
