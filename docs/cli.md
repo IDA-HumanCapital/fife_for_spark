@@ -1,8 +1,8 @@
 FIFE's command-line interface allows you to forecast survival without writing any code. Forecasting circumstances of exit and future states of survival from the command line is coming soon!
 
-### Quick Start
+## Quick Start
 
-##### Configuration
+## Configuration
 
 * Copy your data the directory where you'd like to store your results
 * Ensure there are no other data files in the directory
@@ -11,13 +11,13 @@ FIFE's command-line interface allows you to forecast survival without writing an
   * Change the directory of your Anaconda prompt to your chosen directory
   * Execute `python -c "import fife.utils; fife.utils.create_example_data().to_csv('Input_Data.csv', index=False)"`
 
-##### Execution
+## Execution
 
 * Change the directory of your Anaconda prompt to the directory containing your data
 * Execute `fife`
 * Observe the contents of the FIFE_results folder
 
-### Inputs
+## Inputs
 
 FIFE takes as input:
 
@@ -50,7 +50,7 @@ Input data may not contain any of the following feature names:
 -	`_test`
 -	`_validation`
 
-### Intermediate Files
+## Intermediate Files
 
 FIFE produces as intermediate files:
 
@@ -63,7 +63,7 @@ FIFE produces as intermediate files:
 
 Intermediate files are not intended to be read by humans.
 
-### Outputs
+## Outputs
 
 If `TEST_INTERVALS` is zero, or if `TEST_PERIODS` is one or less and `TEST_INTERVALS` is unspecified, FIFE produces:
 
@@ -88,27 +88,27 @@ All files produced by FIFE will overwrite files of the same name in the director
 
 If 'BY_FEATURE' is specified, then, in addition to Metrics.csv, a separate Metrics_{value}.csv file will be produced for each group defined by each unique value of that feature.
 
-##### Survival_Curves.csv
+### Survival_Curves.csv
 
 - First column: The identifier of each individual observed in the final time period of the dataset.
 - Second column: Each individual's probability of surviving one more period (i.e., appearing in the data once more if the data were to be extended one period beyond the final observed period).
 - Third column: Each individual's probability of surviving two more periods.
 - N-th column: Each individual's probability of surviving N more periods.
 
-##### Aggregate_Survival_Bounds.csv
+### Aggregate_Survival_Bounds.csv
 
 - First column: Time horizons over which the survival probabilities of all individuals observed in the final period of the dataset will be aggregated.
 - Second column: Expected number of individuals retained for each time horizon.
 - Third and fourth columns: Lower and upper two-sided [Chernoff bounds](https://en.wikipedia.org/wiki/Chernoff_bound) to quantify the aggregation uncertainty around the expected number of retained individuals.
 
-##### Retention_Rates.csv
+### Retention_Rates.csv
 
 - First column: The number of time periods since the earliest period in the data.
 - Second column: The share of individuals observed a given number of periods prior who survived to the corresponding period. The number of periods prior is given by the `RETENTION_INTERVAL` configuration parameter.
 - Third column: The model prediction of the corresponding actual retention rate in the second column for periods in the data on which the model was trained.
 - Fourth column: The predicted retention rate for periods in the data on which the model was not trained. These periods include periods in the data excluded from training by the `TEST_PERIODS` or `TEST_INTERVALS` configuration parameter and periods beyond those in the data.
 
-##### Figures
+### Figures
 
 *Retention_Rates.png* plots the contents of *Retention_Rates.csv*.
 
@@ -120,7 +120,7 @@ Plots with names beginning with `Summary_`: SHAP values associated with each of 
 
 Plots with names beginning with `Dependence_`: SHAP values associated with the most important feature against the values of that feature and the values of an automatically selected other feature. Different patterns for differently-colored points indicate that the association between the most important feature and the predicted outcome depends on the value of the other feature. For example, if blue points form an upward-sloping line but red points form a downward-sloping line then a low value of the other feature is associated with a negative correlation between the most important feature and the predicted outcome, but a high value of the other feature is associated with a positive correlation.
 
-##### Metrics.csv
+### Metrics.csv
 
 - First column: Durations of forecast time horizons, given in terms of the number of periods observed in the data. Each of the metrics in the subsequent columns are calculated over the observations from the earliest period in the test set.
 
@@ -140,25 +140,25 @@ Plots with names beginning with `Dependence_`: SHAP values associated with the m
 
 - Ninth column: Concordance index (or "C-index"), a single value to evaluate the model over all time horizons in the test set. The concordance index is, over all pairs of observations where one observation is known to have survived longer, the share of those pairs for which the model predicts a greater restricted mean survival time (RMST) for the observation that survived longer. An individual's RMST is the number of periods the model expects the individual to survive over the greatest horizon for which the model produced a prediction. Like AUROC, a totally uninformed model would be expected to produce a concordance index of 0.5 and a perfect model would produce a concordance index of 1.0.
 
-##### Counts_by_Quantile.csv
+### Counts_by_Quantile.csv
 
 - First column: Time horizon.
 - Second column: The quantile based on predicted probability of survival. For example, if the number of quantiles is given to be 5, quantile 1 represents the 20% (perhaps roughly) of observations predicted least likely to survive the given time horizon among those for which the given horizon could be observed. The number of quantiles is given by the `QUANTILES` configuration parameter.
 - Third column: The number of observations for which the individuals in the given quantile survived the given horizon.
 - Fourth column: The number of observations in the given quantile. Ties in predicted probability among observations may cause the number of observations to vary across quantile for a given time horizon.
 
-##### Forecast_Errors.csv
+### Forecast_Errors.csv
 
 - N-th column: Each test set individual's probability of surviving N more periods, minus one if they survived. Positive zero error indicates a probability of zero; negative zero error indicates a probability of one. The set of errors in this file is sufficient to compute any model performance metrics on the test set.
 
-##### Calibration_Errors.csv
+### Calibration_Errors.csv
 
 - First column: The octile of predicted probabilities in the test set. For example, quantile 1 represents the lowest 12.5% of predicted probabilities among all test set individuals and time horizons.
 - Second column: The mean of the predictions in the given octile.
 - Third column: The share of predictions in the given octile that corresponded to an outcome of survival.
 - Fourth column: The difference between the second and third columns. Values closer to zero indicate better model performance.
 
-### Configuration Parameters
+## Configuration Parameters
 
 You may customize many parameters, such as the maximum share of a feature that may be missing and the share of individuals to reserve for model evaluation. See the [Configuration Parameters](user_guide_link.html#configuration-parameters) section of the User Guide. You can also view a list of parameters and descriptions by executing `fife --h` or `fife --help` in an Anaconda prompt. You can find an example configuration file, readable with any text editor, in the [FIFE GitHub repository](https://github.com/IDA-HumanCapital/fife).
 
