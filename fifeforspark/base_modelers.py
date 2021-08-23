@@ -531,7 +531,7 @@ class SurvivalModeler(Modeler):
             spark_df = spark_df.fillna(False, subset=['_label'])
         else:
             spark_df = spark_df.withColumn(
-                '_label', spark_df[self.duration_col] > lit(time_horizon))
+                '_label', (spark_df[self.duration_col] > lit(time_horizon)).cast('int'))
         return spark_df
 
 
