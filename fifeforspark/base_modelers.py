@@ -497,7 +497,7 @@ class SurvivalModeler(Modeler):
         """
         if self.allow_gaps:
             return data.filter(data[self.max_lead_col] > time_horizon)
-        return data.filter((data[self.duration_col] + data[self.event_col]).cast('int') > time_horizon)
+        return data.filter((data[self.duration_col] + data[self.event_col].cast('int')) > time_horizon)
 
     def label_data(self, time_horizon: int) -> pyspark.sql.DataFrame:
         """
