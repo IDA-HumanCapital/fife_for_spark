@@ -334,9 +334,9 @@ class Modeler(ABC):
             n_intervals (the maximum periods ahead the model will predict)
         """
         train_durations = self.data.select(
-            when(
+            (when(
                 self.data[self.duration_col] <= self.data[self.max_lead_col], self.data[self.duration_col]
-            ).otherwise(self.data[self.max_lead_col]).alias('max_durations')
+            ).otherwise(self.data[self.max_lead_col])).alias('max_durations')
         )
         subset = ~self.data[self.validation_col] & ~self.data[self.test_col] & ~self.data[self.predict_col]
         train_obs_by_lead_length = train_durations.filter(subset)
