@@ -530,7 +530,7 @@ class SurvivalModeler(Modeler):
                 self.config["individual_identifier"] + '_new', self.config["time_identifier"] + '_new')
             spark_df = spark_df.fillna(False, subset=['_label'])
         else:
-            spark_df.withColumn(
+            spark_df = spark_df.withColumn(
                 '_label', spark_df[self.duration_col] > lit(time_horizon))
         return spark_df
 
