@@ -136,7 +136,7 @@ class LGBModeler(Modeler):
         assembler = VectorAssembler(inputCols=feature_columns, outputCol='features')
         lgb_model = lgb(featuresCol="features",
                         labelCol="_label",
-                        *params[time_horizon],
+                        **params[time_horizon],
                         class_weight=data.filter(~data[self.validation_col])[self.weight_col]
                         if self.weight_col
                         else None
