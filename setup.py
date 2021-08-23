@@ -15,7 +15,7 @@ setup(
     ),
     long_description=README,
     long_description_content_type="text/markdown",
-    url="https://github.com/IDA-HumanCapital/fifeforspark",
+    url="https://github.com/IDA-HumanCapital/fife_for_spark",
     #project_urls={
     #    "Bug Tracker": "https://github.com/IDA-HumanCapital/fife/issues",
     #    "Source Code": "https://github.com/IDA-HumanCapital/fife",
