@@ -129,7 +129,7 @@ class LGBModeler(Modeler):
 
         train_data = data.filter(~data[self.validation_col])[
             self.categorical_features + self.numeric_features
-            ]
+            ] + data['_label']
         indexers = [StringIndexer(inputCol=column, outputCol=column + "_index")
                     for column in self.categorical_features]
         feature_columns = [column + "_index" for column in self.categorical_features] + self.numeric_features
