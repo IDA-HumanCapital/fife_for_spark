@@ -33,7 +33,7 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Topic :: Scientific/Engineering :: Information Analysis",
     ],
-    packages=["fife"],
+    packages=["fifeforspark"],
     install_requires=[
         "ipython",
         "lifelines",

@@ -74,7 +74,7 @@ class LGBModeler(Modeler):
             self,
             params: Union[None, dict] = None,
             subset: Union[None, pyspark.sql.column.Column] = None
-    ) -> list[pyspark.ml.pipeline.PipelineModel]:
+    ) -> List[pyspark.ml.pipeline.PipelineModel]:
         """
         Train a LightGBM model for each lead length.
 
