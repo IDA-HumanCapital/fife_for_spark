@@ -127,6 +127,28 @@ def create_example_data2(
         StructField('feature_5', StringType(), True)])
     return spark.createDataFrame(values, schema = schema)
 
+def import_data_file(path: str = "Input Data") -> pyspark.sql.DataFrame:
+    """ Read data into a distributed spark dataframe.. 
+    """
+    findspark.init()
+    spark = SparkSession.builder.getOrCreate()
+    
+    if path is not None:
+        if path.endswith(".avro"):
+            data = spark.read.format('avro').load(path)
+        elif path.endswith(".csv"):
+            data = spark.read.format('csv').load(path)
+        elif path.endswith('.txt'):
+            data = spark.read.format('text').load(path)
+        elif path.endswith(".json"):
+            data = spark.read.format('json').load(path)
+        elif path.endswith(".parquet"):
+            data = spark.read.load(path)
+        else:
+            raise Exception(
+                "Data file extension is invalid.")
+    return data
+
 class FIFEArgParser(argparse.ArgumentParser):
     """Argument parser for the FIFE command-line interface."""
 
