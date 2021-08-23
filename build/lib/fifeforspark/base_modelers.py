@@ -135,7 +135,7 @@ class Modeler(ABC):
         data: Union[None, pyspark.sql.DataFrame] = None,
         duration_col: str = "_duration",
         event_col: str = "_event_observed",
-        predict_col: str = "_predict_col",
+        predict_col: str = "_predict_obs",
         test_col: str = "_test",
         validation_col: str = "_validation",
         period_col: str = "_period",
