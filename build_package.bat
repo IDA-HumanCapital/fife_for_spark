@@ -9,7 +9,7 @@ call C:/Users/%username%/Miniconda3/Scripts/activate.bat
 call C:/Users/%username%/AppData/Local/Continuum/anaconda3/Scripts/activate.bat
 call conda create -y -n fifeforspark python=3.7
 call C:/Users/%username%/Miniconda3/Scripts/activate.bat fifeforspark
-call C:/Users/%username%/AppData/Local/Continuum/anaconda3/Scripts/activate.bat fife_env
+call C:/Users/%username%/AppData/Local/Continuum/anaconda3/Scripts/activate.bat fifeforspark
 pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --upgrade setuptools wheel
 rmdir build /s /q
 python setup.py sdist bdist_wheel
