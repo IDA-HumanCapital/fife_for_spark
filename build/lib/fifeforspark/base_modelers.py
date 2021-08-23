@@ -511,7 +511,7 @@ class SurvivalModeler(Modeler):
         """
         # Spark automatically creates a copy when setting one value equal to another, different from python
         spark_df = self.data
-        spark_df = spark_df.withColumn(spark_df[self.duration_col], when(
+        spark_df = spark_df.withColumn(self.duration_col, when(
             spark_df[self.duration_col] <= spark_df[self.max_lead_col], spark_df[self.duration_col]).otherwise(spark_df[self.max_lead_col]))
         if self.allow_gaps:
             ids = spark_df[self.config["individual_identifier"],
