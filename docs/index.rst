@@ -23,6 +23,7 @@ Python User Guide
 
    user_guide
    cli
+   spark_help
    
    Modules <source/fifeforspark>
 
