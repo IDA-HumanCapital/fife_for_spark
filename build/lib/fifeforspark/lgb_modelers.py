@@ -118,10 +118,9 @@ class LGBModeler(Modeler):
             params = {
                 time_horizon: {
                     "objective": self.objective,
-                    "num_iterations": self.config.get("max_epochs", 256),
+                    "numIterations": self.config.get("max_epochs", 256),
                 }
             }
-        params[time_horizon]["num_class"] = self.num_class
         if subset is None:
             subset = ~self.data[self.test_col] & ~self.data[self.predict_col]
         data = self.label_data(time_horizon)
@@ -129,16 +128,16 @@ class LGBModeler(Modeler):
         data = self.subset_for_training_horizon(data, time_horizon)
 
         train_data = data.filter(~data[self.validation_col])[
-            self.categorical_features + self.numeric_features
-            ]
+            self.categorical_features + self.numeric_features + [data['_label']]
+            ] 
         indexers = [StringIndexer(inputCol=column, outputCol=column + "_index")
                     for column in self.categorical_features]
         feature_columns = [column + "_index" for column in self.categorical_features] + self.numeric_features
         assembler = VectorAssembler(inputCols=feature_columns, outputCol='features')
         lgb_model = lgb(featuresCol="features",
                         labelCol="_label",
-                        *params[time_horizon],
-                        class_weight=data.filter(~data[self.validation_col])[self.weight_col]
+                        **params[time_horizon],
+                        weightCol=data.filter(~data[self.validation_col])[self.weight_col]
                         if self.weight_col
                         else None
                         )
