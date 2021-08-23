@@ -343,8 +343,8 @@ class Modeler(ABC):
         train_obs_by_lead_length = train_obs_by_lead_length.groupBy(
             'max_durations').count()
         min_survivors_subset = train_obs_by_lead_length.filter(
-            train_obs_by_lead_length['count'] > self.config.get(
-                "min_survivors_in_train", 64).alias('max_durations'))
+            (train_obs_by_lead_length['count'] > self.config.get(
+                "min_survivors_in_train", 64)).alias('max_durations'))
         assert min_survivors_subset.first() is not None, "No lead length has more than 64 survivors."
         n_intervals = min_survivors_subset.agg(
             {'max_durations': 'max'}
