@@ -118,10 +118,9 @@ class LGBModeler(Modeler):
             params = {
                 time_horizon: {
                     "objective": self.objective,
-                    "num_iterations": self.config.get("max_epochs", 256),
+                    "numIterations": self.config.get("max_epochs", 256),
                 }
             }
-        params[time_horizon]["num_class"] = self.num_class
         if subset is None:
             subset = ~self.data[self.test_col] & ~self.data[self.predict_col]
         data = self.label_data(time_horizon)
