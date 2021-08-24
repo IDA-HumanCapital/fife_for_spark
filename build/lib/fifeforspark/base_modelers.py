@@ -57,6 +57,8 @@ def compute_metrics_for_binary_outcomes(
     num_true = actuals.agg({'actuals': 'sum'}).first()[0]
     total = actuals.count()
     metrics = OrderedDict()
+    if num_true is None:
+        num_true = 0
     if (num_true > 0) & (num_true < total):
         predictions = predictions.withColumn(
             "row_id", monotonically_increasing_id())
@@ -443,16 +445,20 @@ class SurvivalModeler(Modeler):
         metrics = []
         for lead_length in lead_lengths:
             actuals = self.label_data(int(lead_length - 1))
+            actuals.show()
             actuals = actuals.withColumn('subset', actuals[self.test_col] & 
                 (actuals[self.period_col] == min_val))
             actuals = actuals.filter(actuals.subset)
-            actuals = actuals.filter(actuals[self.max_lead_col] >= lead_length)
-            actuals = actuals.select(actuals["_label"])
+            actuals.show()
+            actuals = actuals.filter(actuals[self.max_lead_col] >= int(lead_length))
+            actuals.show()
+            actuals = actuals.select(actuals["_label"].alias('actuals'))
+            actuals.show()
             metrics.append(
                 compute_metrics_for_binary_outcomes(
                     actuals,
                     predictions.select(
-                        predictions[lead_length - 1]).limit(actuals.count()),
+                        predictions[int(lead_length - 1)].alias('predictions')).limit(actuals.count()),
                     threshold_positive=threshold_positive,
                     share_positive=share_positive,
                 )
