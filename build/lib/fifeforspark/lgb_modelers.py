@@ -9,7 +9,8 @@ from pyspark.ml.feature import VectorAssembler, StringIndexer
 from pyspark.sql.functions import udf, date_format, col
 from pyspark.sql.types import FloatType
 from fifeforspark.base_modelers import default_subset_to_all, Modeler, SurvivalModeler
-
+import databricks.koalas as ks
+ks.set_option('compute.ops_on_diff_frames', True)
 
 class LGBModeler(Modeler):
     """Train a gradient-boosted tree model for each lead length using MMLSpark's LightGBM.
@@ -173,8 +174,7 @@ class LGBModeler(Modeler):
         for i, lead_specific_model in enumerate(self.model):
             if i != 0:
                 pred_year = lead_specific_model.transform(predict_data).selectExpr(f'probability as probability_{i+1}')
-
-                predictions[f'probability_{i+1}'] = firstelement(pred_year[f'probability_{i+1}'])
+                predictions[f'probability_{i+1}'] = pred_year.select(firstelement(pred_year[f'probability_{i+1}'])).to_koalas()
                 if cumulative:
                     predictions[f'probability_{i + 1}'] = predictions[f'probability_{i + 1}'] * predictions[f'probability_{i}']
         return predictions.to_spark()

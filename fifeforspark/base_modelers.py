@@ -173,6 +173,8 @@ class Modeler(ABC):
                 between the period of observations and the last period of the
                 given time horizon.
         """
+        ks.set_option('compute.ops_on_diff_frames', True)
+        
         if (config.get("time_identifier", "") == "") and data is not None:
             config["time_identifier"] = data.columns[1]
 
@@ -431,14 +433,19 @@ class SurvivalModeler(Modeler):
         min_val = filtered.select(self.data[self.period_col]).agg(
             {self.period_col: 'min'}).first()[0]
         if subset is None:
-            subset = self.data[self.test_col] & self.data.select(
-                self.data[self.period_col] == min_val)
+            subset = self.data.select(self.data[self.test_col] & 
+                (self.data[self.period_col] == min_val))
+            self.data = self.data.withColumn('subset', self.data[self.test_col] & 
+                (self.data[self.period_col] == min_val))
         predictions = self.predict(
-            subset=subset, cumulative=(not self.allow_gaps))
+            subset=self.data['subset'], cumulative=(not self.allow_gaps))
         lead_lengths = np.arange(self.n_intervals) + 1
         metrics = []
         for lead_length in lead_lengths:
-            actuals = self.label_data(lead_length - 1).filter(subset)
+            actuals = self.label_data(int(lead_length - 1))
+            actuals = actuals.withColumn('subset', actuals[self.test_col] & 
+                (actuals[self.period_col] == min_val))
+            actuals = actuals.filter(actuals.subset)
             actuals = actuals.filter(actuals[self.max_lead_col] >= lead_length)
             actuals = actuals.select(actuals["_label"])
             metrics.append(
