@@ -478,12 +478,12 @@ class SurvivalModeler(Modeler):
         forecasts = self.predict(
             subset=self.data[self.predict_col], cumulative=(not self.allow_gaps))
         forecasts = forecasts.to_koalas()
-        index = list(self.data.filter(self.data[self.predict_col]).select(
-            self.config["individual_identifier"]).toPandas())
-        len(index)
+        #index = list(self.data.filter(self.data[self.predict_col]).select(
+        #    self.config["individual_identifier"]).toPandas())
+        #print(len(index))
         forecasts.columns = columns
-        forecasts.size
-        forecasts['index'] = index
+        #print(forecasts.size)
+        #forecasts['index'] = index
         return forecasts
 
     def subset_for_training_horizon(self, data: pyspark.sql.DataFrame, time_horizon: int) -> pyspark.sql.DataFrame:
