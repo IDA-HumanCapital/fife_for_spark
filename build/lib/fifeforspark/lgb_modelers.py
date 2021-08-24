@@ -169,17 +169,15 @@ class LGBModeler(Modeler):
         first_model = self.model[0]
         predictions = first_model.transform(predict_data).selectExpr('probability as probability_1')
         predictions = predictions.withColumn('probability_1', firstelement(predictions['probability_1']))
+        predictions = predictions.to_koalas()
         for i, lead_specific_model in enumerate(self.model):
             if i != 0:
                 pred_year = lead_specific_model.transform(predict_data).selectExpr(f'probability as probability_{i+1}')
 
-                predictions = predictions.withColumn(f'probability_{i+1}',
-                                                     pred_year[f'probability_{i+1}'])
+                predictions[f'probability_{i+1}'] = firstelement(pred_year[f'probability_{i+1}'])
                 if cumulative:
-                    predictions = predictions.withColumn(f'probability_{i + 1}',
-                                                         predictions[f'probability_{i + 1}'] *
-                                                         predictions[f'probability_{i}'])
-        return predictions
+                    predictions[f'probability_{i + 1}'] = predictions[f'probability_{i + 1}'] * predictions[f'probability_{i}']
+        return predictions.to_spark()
 
     def transform_features(self) -> pyspark.sql.DataFrame:
         """
