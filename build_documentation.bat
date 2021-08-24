@@ -1,6 +1,6 @@
 rem | This batch file generates documentation for FIFE
 rem | This file will not automatically update the list of modules
-rem | To update the list of modules, edit docs/source/fife.rst
+rem | To update the list of modules, edit docs/source/fifeforspark.rst
 rem | You may also wish to edit README.md and the files in docs/
 rem | The documentation front page will be docs/_build/index.html
 rem | This file requires an Anaconda (or Miniconda) installation
