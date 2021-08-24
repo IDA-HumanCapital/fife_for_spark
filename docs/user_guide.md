@@ -4,8 +4,8 @@ The Finite-Interval Forecasting Engine for Spark (FIFEforSpark) is an adaptation
 
 ### Installation
 
-```
-pip install fife
+``` python
+pip install fifeforspark
 ```
 
 Details
@@ -196,7 +196,7 @@ With FIFEforSpark, we can use machine learning to consider the interactions of f
 
 Our method to account for :math:`x` is to estimate the hazard separately for each unique value of :math:`t`. We can describe this method as :math:`h(t,x)=h_{t}(x)`. This method is only as useful as the number of observations that exit at each time horizon. If the time horizon has continuous support, so that there are an infinite number of forecastable time horizons, this method is infeasible. However, panel data exhibit a finite number of forecastable time horizons. A panel data time horizon must be a whole  number of periods less than the number of periods in the dataset.  Therefore we can fit :math:`h_{t}(x)` separately for each such :math:`t`.
 
-For each :math:`t`, we fit :math:`h_{t}(x)` to observations of the feature vector :math:`x` and the binary outcome :math:`y`. We can use any binary classification algorithm to fit :math:`h_{t}(x)`. We need not specify a functional form. Using FIFE, we can fit not only the hazard, but any function of :math:`x` for each time horizon :math:`t`. For example, we can forecast the future value of some feature  immediately before a given time horizon, conditional on exit at that  time horizon. Alternatively, we can forecast a future feature value conditional on survival. 
+For each :math:`t`, we fit :math:`h_{t}(x)` to observations of the feature vector :math:`x` and the binary outcome :math:`y`. We can use any binary classification algorithm to fit :math:`h_{t}(x)`. We need not specify a functional form. Using FIFEforSpark, we can fit not only the hazard, but any function of :math:`x` for each time horizon :math:`t`. For example, we can forecast the future value of some feature  immediately before a given time horizon, conditional on exit at that  time horizon. Alternatively, we can forecast a future feature value conditional on survival. 
 
 Like the Kaplan-Meier estimator, our method addresses censoring by  considering only observations for which we observe exit or survival at the given time horizon. In other words, we address censoring by subsetting the data for each :math:`t`. The panel nature of the data make this subsetting simple: if there are :math:`T` periods in the data, only observations from the earliest :math:`T−t` periods allow us to observe exit or survival :math:`t` periods ahead. For example, suppose we have annual observations from 2000 through 2019 available for model fitting. Let our time horizon be four years. We exclude the most recent four years, leaving observations from 2000 through 2015. Among those observations, we keep only those retained at least three years from the time of observation. Then we compute the binary outcome of survival or exit four years from the time of observation. This estimation actually looks at one minus the hazard, which leaves survival as a positive class. 
 
