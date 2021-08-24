@@ -171,11 +171,10 @@ class LGBModeler(Modeler):
         predictions = predictions.withColumn('probability_1', firstelement(predictions['probability_1']))
         for i, lead_specific_model in enumerate(self.model):
             if i != 0:
-                pred_year = lead_specific_model.transform(predict_data).select(col('probability').alias(f'probability_{i+1}'))
-                #Expr(f'probability as probability_{i+1}')
+                pred_year = lead_specific_model.transform(predict_data).selectExpr(f'probability as probability_{i+1}')
 
                 predictions = predictions.withColumn(f'probability_{i+1}',
-                                                     firstelement(pred_year[f'probability_{i+1}']))
+                                                     pred_year[f'probability_{i+1}'])
                 if cumulative:
                     predictions = predictions.withColumn(f'probability_{i + 1}',
                                                          predictions[f'probability_{i + 1}'] *
@@ -191,17 +190,17 @@ class LGBModeler(Modeler):
         """
         data = self.data
         date_cols = [x for x, y in data.dtypes if y in ['date', 'timestamp']]
-        for col in date_cols:
-            data = data.withColumn(col,
-                                   10000*date_format(data[col], "y") +
-                                   100*date_format(data[col], "M") +
-                                   date_format(data[col], "d"))
+        for date_col in date_cols:
+            data = data.withColumn(date_col,
+                                   10000*date_format(data[date_col], "y") +
+                                   100*date_format(data[date_col], "M") +
+                                   date_format(data[date_col], "d"))
         return data
 
-    def save_model(self, file_name: str = "GBT_Model", path: str = "") -> None:
+    def save_model(self, path: str = "") -> None:
         """
         Save the horizon-specific LightGBM models that comprise the model to disk.
-        Functionality does not currently exist
+        Functionality currently in progress.
 
         Args:
             file_name: The desired name of the model on disk
@@ -210,7 +209,8 @@ class LGBModeler(Modeler):
         Returns:
             None
         """
-        pass
+        for model in lgb.model:
+            model.write().overwrite().save(path)
 
 
 class LGBSurvivalModeler(LGBModeler, SurvivalModeler):
