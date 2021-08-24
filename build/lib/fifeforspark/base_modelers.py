@@ -479,7 +479,7 @@ class SurvivalModeler(Modeler):
             subset=self.data[self.predict_col], cumulative=(not self.allow_gaps))
         forecasts = forecasts.to_koalas()
         index = list(self.data.filter(self.data[self.predict_col]).select(
-            self.data[self.config["individual_identifier"]]).toPandas()["individual_identifier"])
+            self.data[self.config["individual_identifier"]]).toPandas())
         forecasts.columns = columns
         forecasts['index'] = index
         return forecasts
