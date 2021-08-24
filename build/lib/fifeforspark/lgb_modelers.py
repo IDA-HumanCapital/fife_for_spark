@@ -6,7 +6,7 @@ import mmlspark.lightgbm.LightGBMClassifier as lgb
 import pyspark.sql
 from pyspark.ml import Pipeline
 from pyspark.ml.feature import VectorAssembler, StringIndexer
-from pyspark.sql.functions import udf, date_format
+from pyspark.sql.functions import udf, date_format, col
 from pyspark.sql.types import FloatType
 from fifeforspark.base_modelers import default_subset_to_all, Modeler, SurvivalModeler
 
@@ -171,7 +171,8 @@ class LGBModeler(Modeler):
         predictions = predictions.withColumn('probability_1', firstelement(predictions['probability_1']))
         for i, lead_specific_model in enumerate(self.model):
             if i != 0:
-                pred_year = lead_specific_model.transform(predict_data).selectExpr(f'probability as probability_{i+1}')
+                pred_year = lead_specific_model.transform(predict_data).select(col('probability').alias(f'probability_{i+1}'))
+                #Expr(f'probability as probability_{i+1}')
 
                 predictions = predictions.withColumn(f'probability_{i+1}',
                                                      firstelement(pred_year[f'probability_{i+1}']))
