@@ -1,192 +1,158 @@
 ## Quick Start
 
-The Finite-Interval Forecasting Engine (FIFE) conducts discrete-time survival analysis and multivariate time series forecasting on panel data. We will show you here how to build your own model pipeline in Python, but you can also use the pre-created functionality in [Command Line](command_line.md). You can also see a full example that uses the [Rulers, Elections, and Irregular Governance dataset (REIGN)](https://oefdatascience.github.io/REIGN.github.io/) in this [notebook](https://nbviewer.jupyter.org/github/IDA-HumanCapital/fife/blob/master/examples/country_leadership.ipynb).
+The Finite-Interval Forecasting Engine for Spark (FIFEforSpark) is an adaptation of the Finite-Interval Forecasting Engine for the Apache Spark environment. Currently, it provides machine learning models, specifically a gradient boosted tree model, for discrete-time survival analysis. We will show you here how to build your own model pipeline in Python, but you can also use the pre-created functionality in [Command Line](cli.md). You can also see a full example that uses the [Rulers, Elections, and Irregular Governance dataset (REIGN)](https://oefdatascience.github.io/REIGN.github.io/) in this notebook.
 
+### Installation
+
+```
+pip install fife
+```
+
+Details
+
+- Install an [Anaconda distribution](https://www.anaconda.com/distribution/) of Python version 3.8.5 or later
+- From pip (with no firewall):
+  - Open Anaconda Prompt
+  - Execute `pip install fifeforspark`
+- From pip (with firewall):
+  - Open Anaconda Prompt
+  - Execute `pip install --trusted-host pypi.org fifeforspark`
+
+Alternatives
+
+- From pypi.org ():
+
+  - Download the `.whl` or `.tar.gz` file
+
+  - Open Anaconda Prompt
+
+  - - Change the current directory in Anaconda Prompt to the location where the `.whl` or `.tar.gz` file is saved. 
+
+      Example: `cd C:\Users\insert-user-name\Downloads`
+
+  - - Pip install the name of the `.whl` or `.tar.gz` file. 
+
+      Example: `pip install fife-1.5.1-py3-none-any.whl`
+
+- From GitHub (https://github.com/IDA-HumanCapital/fife_for_spark):
+
+  - Clone the fife_for_spark repository
+  - Open Anaconda Prompt
+  - Change the current directory in Anaconda Prompt to the directory of the cloned FIFE repository
+  - Execute `python setup.py sdist bdist_wheel`
+  - Execute `pip install dist/fife_for_spark-0.0.1-py3-none-any.whl`
 
 ### LGBSurvivalModeler
 
-To get started, we'll want a module to process our panel data and another module to use the processed data to train a model. In this example, we'll build gradient-boosted tree models using [LightGMB](https://lightgbm.readthedocs.io/en/latest/).  To learn more about how this model is built, see [Introduction to Survival Analysis using Panel Data](intro_md).
+To get started, we'll want a module to process our panel data and another module to use the processed data to train a model. In this example, we'll build gradient-boosted tree models using [MMLSpark's LightGBM](https://github.com/microsoft/SynapseML/blob/master/docs/lightgbm.md). 
 
-.. code-block:: python
+```python
+from fifeforspark.processors import PanelDataProcessor
+from fifeforspark.lgb_modelers import LGBSurvivalModeler
+```
 
-    from fife.processors import PanelDataProcessor
-    from fife.lgb_modelers import LGBSurvivalModeler
+We’ll need to supply a data file in the form of panel data. If you don’t have a file already available, you can use our example data. This is nearly identical to FIFE's create_example_data function, though there are two versions available.
 
-We’ll need to supply a data file in the form of panel data. If you don’t have a file already available, you can use our example data:
-
-.. code-block:: python
-
-    from fife.utils import create_example_data
-    data = create_example_data()
+```python
+from fifeforspark.utils import create_example_data1
+data = create_example_data1()
+```
 
 In order to make sure our results are reproducible, we can use the `make_results_reproducible` function: 
 
-.. code-block:: python
+```python
+from fifeforspark.utils import make_results_reproducible
+make_results_reproducible()
+```
+
+Exactly like FIFE, the Panel Data Processor will make our dataset ready for modeling, to include sorting by individual and time, dropping degenerate and duplicated features, and computing survival durations and censorship status. We can specify processing parameters different than the defaults in the `config` argument.    
+
+```python
+data_processor = PanelDataProcessor(data=data)
+data_processor.build_processed_data()
+```
+
+Once we've called `data_processor.build_processed_data()`, the completed data will be available at `data_processor.data`. We can then use this in our models. For our first example, let's use a gradient-boosted trees modeler. Like the data building process, we can change modeling parameters in the config argument. Perhaps we prefer a learning rate value of 0.2 rather than the default value of 0.1.
+
+```python
+survival_modeler = LGBSurvivalModeler(config={'learningRate': 0.2}, 
+    data=data_processor.data)
+survival_modeler.build_model()
+```
+
+Exactly like FIFE, our discrete-time survival "model" is actually a list of models, one for each time horizon. The first model produces a probability of survival through the first future period, the second model produces a probability of survival through the second future period conditional on survival through the first future period, and so on. In general, we are most interested in forecasts for individuals that are still in the population in the final period of the data. The `forecast` method gives us exactly those forecasts. The survival probabilities in the forecasts are cumulative - they are not conditional on survival through any prior future period.     
+
+```python
+survival_modeler.forecast()
+```
+
+Because our forecasts are for the final period of data, we can't measure their performance in future periods. However, we can train a new model where we pretend an earlier period is the final period, then measure performance through the actual final period. In other words, we can reserve some of the most recent periods for testing. Notice once again that the syntax is identical to that of FIFE. Here is an example:
+
+```python
+test_intervals = 4
+data_processor = PanelDataProcessor(config={'TEST_INTERVALS': test_intervals},
+                                	data=data)
+data_processor.build_processed_data()
+survival_modeler = LGBSurvivalModeler(data=data_processor.data)
+survival_modeler.build_model()
+```
+
+The `evaluate` method offers a suite of performance metrics specific to each time horizon as well as the concordance index over the restricted mean survival time. We can pass a Boolean mask to `evaluate` to obtain metrics only for the period we pretended was the most recent period. Be careful to not set `TEST_INTERVALS` to be too large; if it exceeds half of the number of intervals, it will not provide the training dataset with enough intervals. Here, rather than passing in a Boolean pandas series, we pass in a Spark DataFrame column with Boolean values.
     
-    from fife.utils import make_results_reproducible
-    make_results_reproducible()
 
-The Panel Data Processor will make our dataset ready for modeling, to include sorting by individual and time, dropping degenerate and duplicated features, and computing survival durations and censorship status. We can specify processing parameters different than the defaults in the `config` argument. Perhaps we'd rather have an 80/20 validation split than the default 75/25. See the [Configuration Parameters](#id2) section for more details.
+```python
+min_val = survival_modeler.data.select(survival_modeler.data['_period']).agg({'_period': 'min'}).first()[0]
+evaluation_subset = survival_modeler.data.select(survival_modeler.data['_period'] == min_val)   
+survival_modeler.evaluate(evaluation_subset)
+```
 
-.. code-block:: python
-    
-    data_processor = PanelDataProcessor(config={'VALIDATION_SHARE': 0.2}, data=data)
-    data_processor.build_processed_data()
+`evaluate` offers just one of many ways to examine a model. For example, we can answer "In each time period, what share of the observations two periods past would we expect to still be around?"
 
-Once we've called `data_processor.build_processed_data()`, the completed data will be available at `data_processor.data`. We can then use this in our models. For our first example, let's use a gradient-boosted trees modeler. Like the data building process, we can change modeling parameters in the config argument. Perhaps we prefer a patience value of 8 rather than the default value of 4.
-
-.. code-block:: python
-
-    survival_modeler = LGBSurvivalModeler(config={'PATIENCE': 8}, 
-        data=data_processor.data)
-    survival_modeler.build_model()
-
-In the case of gradient-boosted trees, our discrete-time survival "model" is actually a list of models, one for each time horizon. The first model produces a probability of survival through the first future period, the second model produces a probability of survival through the second future period conditional on survival through the first future period, and so on.
-
-We can access the list of models as an attribute of our modeler. For example, we can see how many trees are in each model. Our `PATIENCE` parameter value of 8 configured each model to train until model performance on the validation set does not improve for eight consecutive trees (or no more splits can improve fit). That means the number of trees can vary across models.
-
-.. code-block:: python
-    
-    [i.num_trees() for i in survival_modeler.model]
-
-We can also observe the relative importance of each feature, in this case in terms of the number of times the feature was used to split a tree branch.
-
-.. code-block:: python
-
-    dict(zip(survival_modeler.model[0].feature_name(),
-            survival_modeler.model[0].feature_importance()))
-
-In general, we are most interested in forecasts for individuals that are still in the population in the final period of the data. The `forecast` method gives us exactly those forecasts. The survival probabilities in the forecasts are cumulative - they are not conditional on survival through any prior future period. See the description of [Survival_Curves.csv](cli_link.html#survival-curves-csv) for more details.
-
-.. code-block:: python
-    
-    survival_modeler.forecast()
-
-Because our forecasts are for the final period of data, we can't measure their performance in future periods. However, we can train a new model where we pretend an earlier period is the final period, then measure performance through the actual final period. In other words, we can reserve some of the most recent periods for testing. Here is an example:
-
-.. code-block:: python
-
-    test_intervals = 4
-    data_processor = PanelDataProcessor(config={'VALIDATION_SHARE': 0.2,
-                                            'TEST_INTERVALS': test_intervals},
-                                    data=data)
-    data_processor.build_processed_data()
-    survival_modeler = LGBSurvivalModeler(config={'PATIENCE': 8},
-                                      data=data_processor.data)
-    survival_modeler.build_model()
-
-The `evaluate` method offers a suite of performance metrics specific to each time horizon as well as the concordance index over the restricted mean survival time. See the description of [Metrics.csv](cli_link.html#metrics-csv) above for more details. We can pass a Boolean mask to `evaluate` to obtain metrics only for the period we pretended was the most recent period. Be careful to not set `TEST_INTERVALS` to be too large; if it exceeds half of the number of intervals, it will not provide the training dataset with enough intervals.
-
-.. code-block:: python
-    
-    evaluation_subset = survival_modeler.data["_period"] == (
-            survival_modeler.data["_period"].max() - test_intervals
-        )
-    survival_modeler.evaluate(evaluation_subset)
-
-The model we train depends on hyperparameters such as the maximum number of leaves per tree and the minimum number of observations per leaf. The `hyperoptimize` method searches for better hyperparameter values than the LightGBM defaults. We need only specify the number of hyperparameter sets to trial. `hyperoptimize` will return the set that performs best on the validation set for each time horizon.
-
-.. code-block:: python
-
-    params = survival_modeler.hyperoptimize(16)
-
-Now we can train and evaluate a new model with our curated hyperparameters.
-
-.. code-block:: python
-
-    survival_modeler.build_model(params=params)
-    survival_modeler.evaluate(evaluation_subset)
-
-`evaluate` offers just one of many ways to examine a model. For example, we can answer "In each time period, what share of the observations two periods past would we expect to still be around?" See the description of [Retention_Rates.csv](cli_link.html#retention-rates-csv) for more details.
-
-.. code-block: python
-
-    survival_modeler.tabulate_retention_rates(2)
+```python
+survival_modeler.tabulate_retention_rates(2)
+```
 
 Other modelers define different ways of using data to create forecasts and metrics, but they all support the methods `build_model`, `forecast`, `evaluate` and more.
-
-### LGBStateModeler
-
-Suppose we want to model not survival, but the future value of a feature conditional on survival. We can do with only two modifications: 1) replace our survival modeler with a state modeler, and 2) specify the feature to forecast. Let's pick `feature_4`.
-
-.. code-block:: python
-
-    from fife.lgb_modelers import LGBStateModeler
-    state_modeler = LGBStateModeler(state_col="feature_4",
-                                config={'PATIENCE': 8},
-                                data=data_processor.data)
-    state_modeler.build_model()
-    state_modeler.forecast()
-
-Because `feature_4` is categorical, our modeler trains a multiclass classification model for each time horizon and forecasts a probability of each category value in each future period for each individual in observed in the most recent period of data.  If we had chosen a numeric feature like `feature_1` or `feature_3`, our modeler would train a regression model for each time horizon and forecast the value of the feature in each future period.
-
-### LGBExitModeler
-
-Suppose we want to forecast the circumstances under which an exit would occur if it did occur. Typically, information on exit circumstances is an a separate dataset (otherwise, you might have an absurdly good predictor of survival!). In that case, you'd want to merge that dataset with your panel data to label each observation directly preceding an exit with the circumstances of that exit. For the purpose of this example, however, we'll treat `feature_3` as the circumstances of exit. FIFE will exclude the column representing circumstances of exit from the set of features.
-
-We need only change from a state modeler to an exit modeler, and specify an `exit_col` instead of a `state_col`.
-
-.. code-block:: python
-    
-    from fife.lgb_modelers import LGBExitModeler
-    exit_modeler = LGBExitModeler(exit_col="feature_3",
-                              config={'PATIENCE': 8},
-                              data=data_processor.data)
-    exit_modeler.build_model()
-    exit_modeler.forecast()
-
-Just like the state modeler, the exit modeler can handle categorical or numeric outcomes. Because `feature_3` is numeric, our modeler trains a regression model for each time horizon. For each future period, conditional on exit (i.e., ceasing to be observed) in that period, our modeler forecasts the value of `feature_3` in the period directly prior.
-
-FIFE unifies survival analysis (including competing risks) and multivariate time series analysis. Tools for the former neglect future states of survival; tools for the latter neglect the possibility of discontinuation. Traditional forecasting approaches for each, such as proportional hazards and vector autoregression (VAR), respectively, impose restrictive functional forms that limit forecasting performance. FIFE supports *the* state-of-the-art approaches for maximizing forecasting performance: gradient-boosted trees (using [LightGBM](https://lightgbm.readthedocs.io/en/latest/)) and neural networks (using [Keras](https://keras.io/)).
 
 ## Introduction to Survival Analysis
 
 ### Panel Data
 
-FIFE uses data called **panel data**, which we define as periodic observations of subjects within a given time frame. Each observation is defined by a subject and a period. For example, each record of an active duty service member has a unique combination of social security number and year. Each observation has a vector of feature values. We may observe pay grade, occupation, and duty location. The period of observation is also a feature value. Not every service member is observed in every year, which makes the panel **unbalanced**. 
+The following is also all true for FIFE; however, to keep this package self contained, we include it here as well.
+
+FIFEforSpark uses data called **panel data**, which we define as periodic observations of subjects within a given time frame. Each observation is defined by a subject and a period. For example, each record of an active duty service member has a unique combination of social security number and year. Each observation has a vector of feature values. We may observe pay grade, occupation, and duty location. The period of observation is also a feature value. Not every service member is observed in every year, which makes the panel **unbalanced**. 
 
 Unbalanced panels are not unique to personnel data, but are a natural product of any periodic record-keeping where the roster of subjects  changes over periods. An unbalanced panel could track equipment, medical patients, organizations, research and development programs, stockpiles, or natural phenomena. 
 
-Perhaps your panel data looks like this:
+Suppose you have a dataset that looks like this:
 
-.. table::
+| ID   | period | feature_1 | feature_2 | feature_3 | ...  |
+| ---- | ------ | --------- | --------- | --------- | ---- |
+| 0    | 2016   | 7.2       | A         | 2AX       | ...  |
+| 0    | 2017   | 6.4       | A         | 2AX       | ...  |
+| 0    | 2018   | 6.6       | A         | 1FX       | ...  |
+| 0    | 2019   | 7.1       | A         | 1FX       | ...  |
+| 1    | 2016   | 5.3       | B         | 1RM       | ...  |
+| 1    | 2017   | 5.4       | B         | 1RM       | ...  |
+| 2    | 2017   | 6.7       | A         | 1FX       | ...  |
+| 2    | 2018   | 6.9       | A         | 1RM       | ...  |
+| 2    | 2019   | 6.9       | A         | 1FX       | ...  |
+| 3    | 2017   | 4.3       | B         | 2AX       | ...  |
+| 3    | 2018   | 4.1       | B         | 2AX       | ...  |
+| 4    | 2019   | 7.4       | B         | 1RM       | ...  |
+| ...  | ...    | ...       | ...       | ...       | ...  |
 
-    ====    =======     ===========     =========   =========   ====
-     ID     period      feature_1       feature_2   feature_3   ...
-    ====    =======     ===========     =========   =========   ====
-    0       2016        7.2             A           2AX         ...  
-    0       2017        6.4             A           2AX         ...  
-    0       2018        6.6             A           1FX         ...  
-    0       2019        7.1             A           1FX         ...  
-    1       2016        5.3             B           1RM         ...  
-    1       2017        5.4             B           1RM         ...  
-    2       2017        6.7             A           1FX         ...  
-    2       2018        6.9             A           1RM         ...  
-    2       2019        6.9             A           1FX         ...  
-    3       2017        4.3             B           2AX         ...  
-    3       2018        4.1             B           2AX         ...  
-    4       2019        7.4             B           1RM         ...  
-    ...     ...         ...             ...         ...         ...  
-    ====    =======     ===========     =========   =========   ====
+The entities with IDs 0, 2, and 4 are observed in the dataset in 2019.
 
-Using this data, we may want answers about which individuals will still be in the data in a future time period. We also may want to ask other questions:
-
-* What are each of their probabilities of being observed in 2020? 2021? 2022?
-* Given that they will be observed, what will be the value of feature_1? feature_3?
-* Suppose entities can exit the dataset under a variety of circumstances. If entities 0, 2, or 4 exit in a given year, what will their circumstances be?
-
-* How reliable can we expect these forecasts to be?
-* How do the values of the features inform these forecasts?
-
-FIFE can estimate answers to these questions for any unbalanced panel dataset.
+While FIFE offers a significantly larger suite of models designed to answer a variety of questions, FIFEforSpark is mainly focused on one question: what are each of their probabilities of being observed in any future year? Fortunately, FIFEforSpark can estimate answers to these questions for any unbalanced panel dataset.
 
 Survival analysis was first used to determine if someone lived or died. Today, however, we can use its theories to define exits from a binary state as either a _life_ or _death_. For instance, we can investigate if an individual leaves the military service by asking if this individual "dies." If another individual joins the service, we can say they were "born."
 
-We can use these ideas to define retention as "living" and attrition as "dying." To investigate retention, FIFE seeks forecasts for observations in the final period of the dataset. For each observation, we define “retention” as the observation of the  same subject in a given number of consecutive future periods. For example, 2-year retention of a subject observed in 2019 means observing the same subject in 2020 and 2021. Note that we define  retention with reference to the time of observation. We ask not “will this individual be in the dataset in 2 years,” but “will this member be in this dataset 2 more years from this date?”
+We can use these ideas to define retention as "living" and attrition as "dying." To investigate retention, FIFEforSpark seeks forecasts for observations in the final period of the dataset. For each observation, we define “retention” as the observation of the  same subject in a given number of consecutive future periods. For example, 2-year retention of a subject observed in 2019 means observing the same subject in 2020 and 2021. Note that we define  retention with reference to the time of observation. We ask not “will this individual be in the dataset in 2 years,” but “will this member be in this dataset 2 more years from this date?”
 
 ### Censoring
 
-One of the key concepts that survival analysis attempts to address is that of **censoring**. If an individual is present in the last date for which we have data, we don't know if that individual left the data, or if they did, at what point. This individual is *right censored* (left censoring can also happen if the individual entered before our data began, but this does not impact the FIFE in the same way as right censoring). If we were just to remove all censored individuals, we will create bias because we would only be using the people we've seen leave, therefore not allowing for a person to leave later than our final date. We must, then, assume that the censored individual could still attrite later and mark them as remaining.
+One of the key concepts that survival analysis attempts to address is that of **censoring**. If an individual is present in the last date for which we have data, we don't know if that individual left the data, or if they did, at what point. This individual is *right censored* (left censoring can also happen if the individual entered before our data began, but this does not impact the FIFEforSpark in the same way as right censoring). If we were just to remove all censored individuals, we will create bias because we would only be using the people we've seen leave, therefore not allowing for a person to leave later than our final date. We must, then, assume that the censored individual could still attrite later and mark them as remaining.
 
 ### Survival Function
 
@@ -224,9 +190,9 @@ The problem is the Kaplan-Meier estimation to the survival curve, and the result
 
 Another method to account for :math:`x` is to apply the Kaplan-Meier estimator separately for each unique value of :math:`x`. We can describe this method as :math:`h(t,x)=h_{x}(t)`. This method is only as useful as the number of observations with each unique value. For example, because there are thousands of active duty service members in each service in each year, this method would be  useful to estimate a separate hazard function for each service. We could also estimate a separate hazard function for each combination of service and entry year. However, we would be limiting :math:`x` to contain the values of only two features. We could not use this method to estimate a separate hazard function for each combination of  feature values among the hundreds of features in our data. Even a single feature with continuous support, such as the amount a member commits to their Thrift Savings Plan (TSP), makes this method infeasible.
 
-### FIFE: Using Machine Learning
+### FIFEforSpark : Using Machine Learning
 
-With FIFE, we can use machine learning to consider the interactions of feature values in predicting whether an individual will stay or leave. Traditional methods in the domain of survival analysis effectively consider all forecastable future time horizons by expressing the probability of retention as a continuous function of time since observation. In the case of panel data,  however, all forecastable time horizons fall in a discrete domain with a finite number of intervals. We can, therefore, consider each forecastable time horizon separately rather than treating time as continuous, unlocking all manner of forecasting methods not designed for survival analysis, including state-of-the-art machine learning methods.
+With FIFEforSpark, we can use machine learning to consider the interactions of feature values in predicting whether an individual will stay or leave. Traditional methods in the domain of survival analysis effectively consider all forecastable future time horizons by expressing the probability of retention as a continuous function of time since observation. In the case of panel data,  however, all forecastable time horizons fall in a discrete domain with a finite number of intervals. We can, therefore, consider each forecastable time horizon separately rather than treating time as continuous, unlocking all manner of forecasting methods not designed for survival analysis, including state-of-the-art machine learning methods.
 
 Our method to account for :math:`x` is to estimate the hazard separately for each unique value of :math:`t`. We can describe this method as :math:`h(t,x)=h_{t}(x)`. This method is only as useful as the number of observations that exit at each time horizon. If the time horizon has continuous support, so that there are an infinite number of forecastable time horizons, this method is infeasible. However, panel data exhibit a finite number of forecastable time horizons. A panel data time horizon must be a whole  number of periods less than the number of periods in the dataset.  Therefore we can fit :math:`h_{t}(x)` separately for each such :math:`t`.
 
@@ -258,9 +224,9 @@ While we could stop training after one tree, gradient boosting allows us to impr
 
 where :math:`X_{i\tau}` is a vector of feature values for individual :math:`i` at time :math:`\tau`, and :math:`T_{i\tau}` is the number of consecutive future periods the individual remains after time :math:`\tau`. 
 
-FIFE is highly customizable for an individual project. These are the different parameters that can be overwritten in a `config.json` file.
-
 ## Configuration Parameters
+
+FIFEforSpark is highly customizable for an individual project. These are the different parameters that can be overwritten in a `config.json` file.
 
 ### Input/output
 
@@ -312,15 +278,6 @@ VALIDATION_SHARE; default: 0.25; type: Decimal
 TREE_MODELS; default: `true`; type: Boolean
 	Whether FIFE will train gradient-boosted trees, as opposed to a neural network.
 
-### Hyperoptimization
-
-HYPER_TRIALS; default: 0; type: Integer
-	The number of hyperparameter sets to trial. If zero, validation early stopping will be used to decide the number of epochs. Larger values may increase run time and/or model performance.
-MAX_EPOCHS; default: 256; type: Integer
-	If HYPER_TRIALS is zero, the maximum number of passes through the training set. Larger values may increase run time and/or model performance.
-PATIENCE; default: 4; type: Integer
-	If HYPER_TRIALS is zero, the number of passes through the training dataset without improvement in validation set performance before training is stopped early. Larger values may increase run time and/or model performance.
-
 
 ### Metrics
 
@@ -330,21 +287,5 @@ QUANTILES; default: 5; type: Integer
 	The number of similarly-sized bins for which survival and total counts will be reported for each time horizon. Larger values may increase run time and/or evaluation precision.
 RETENTION_INTERVAL; default: 1; type: Integer
 	The number of periods over which retention rates are computed.
-SHAP_PLOT_ALPHA; default: 0.5; type: Decimal
-	The transparency of points in SHAP plots. Larger values may increase visibility of non-overlapped points and/or decrease visibility of overlapped points.
-SHAP_SAMPLE_SIZE; default: 128; type: Integer
 
 ## Frequently Asked Questions (FAQs)
-
-### Should I specify all feature columns through the numeric or categorical `config` parameters? 
-
-This mostly depends on what you wish to accomplish with your model. If, for example, you want to investigate the features that make the predictions using SHAP, you'll want to maximize your numeric features. In this case, you may want to make sure all columns are categorized to have the most numeric features. Otherwise, the model will run correctly with the default configuration.
-
-### Should I treat a DateTime feature as numerical or categorical? 
-
-Generally you should treat dates as numeric. The only time when you could use dates in the categorical sense and have the model be representative is in the unusual case where the categories of the observations for which you care to obtain predictions are all represented in the training set.
-
-### If I decide to treat DateTime as categorical, how can I ensure FIFE will run correctly? 
-
-If you want to treat a date as a discrete, categorical variable, follow these steps: Datetime to string, string to categorical. This will allow LightGBM to properly serialize dates as categorical values.
-	The number of observations randomly sampled for SHAP value calculation and plotting. Larger values may increase SHAP plot representativeness and/or run time.
