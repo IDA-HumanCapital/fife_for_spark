@@ -445,15 +445,11 @@ class SurvivalModeler(Modeler):
         metrics = []
         for lead_length in lead_lengths:
             actuals = self.label_data(int(lead_length - 1))
-            actuals.show()
             actuals = actuals.withColumn('subset', actuals[self.test_col] & 
                 (actuals[self.period_col] == min_val))
             actuals = actuals.filter(actuals.subset)
-            actuals.show()
             actuals = actuals.filter(actuals[self.max_lead_col] >= int(lead_length))
-            actuals.show()
             actuals = actuals.select(actuals["_label"].alias('actuals'))
-            actuals.show()
             metrics.append(
                 compute_metrics_for_binary_outcomes(
                     actuals,
@@ -466,16 +462,7 @@ class SurvivalModeler(Modeler):
         metrics = pd.DataFrame(metrics, index=lead_lengths)
         metrics.index.name = "Lead Length"
         metrics["Other Metrics:"] = ""
-        if (not self.allow_gaps) and (self.weight_col is None):
-            concordance_index_value = concordance_index(
-                self.data[subset][[self.duration_col,
-                                   self.max_lead_col]].min(axis=1),
-                np.sum(predictions, axis=-1),
-                self.data[subset][self.event_col],
-            )
-            metrics["C-Index"] = np.where(
-                metrics.index == 1, concordance_index_value, ""
-            )
+        #Removed concordance index functionality for now
         metrics = metrics.dropna()
         return metrics
 

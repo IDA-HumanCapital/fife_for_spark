@@ -462,16 +462,7 @@ class SurvivalModeler(Modeler):
         metrics = pd.DataFrame(metrics, index=lead_lengths)
         metrics.index.name = "Lead Length"
         metrics["Other Metrics:"] = ""
-        #if (not self.allow_gaps) and (self.weight_col is None):
-        #    concordance_index_value = concordance_index(
-        #        self.data[subset][[self.duration_col,
-        #                           self.max_lead_col]].min(axis=1),
-        #        np.sum(predictions, axis=-1),
-        #        self.data[subset][self.event_col],
-        #    )
-        #    metrics["C-Index"] = np.where(
-        #        metrics.index == 1, concordance_index_value, ""
-        #    )
+        #Removed concordance index functionality for now
         metrics = metrics.dropna()
         return metrics
 
