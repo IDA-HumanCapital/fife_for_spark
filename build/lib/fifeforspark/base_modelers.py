@@ -432,10 +432,11 @@ class SurvivalModeler(Modeler):
             outcome of True, and all elements of the confusion matrix. Also
             includes concordance index over the restricted mean survival time.
         """
-        filtered = self.data.filter(self.data[self.test_col])
-        min_val = filtered.select(self.data[self.period_col]).agg(
-            {self.period_col: 'min'}).first()[0]
+        min_val = 0
         if subset is None:
+            filtered = self.data.filter(self.data[self.test_col])
+            min_val = filtered.select(self.data[self.period_col]).agg(
+                {self.period_col: 'min'}).first()[0]
             self.data = self.data.withColumn('subset', self.data[self.test_col] & 
                 (self.data[self.period_col] == min_val))
         else:
@@ -448,6 +449,7 @@ class SurvivalModeler(Modeler):
         lead_lengths = np.arange(self.n_intervals) + 1
         metrics = []
         for lead_length in lead_lengths:
+            print(f'Now evaluating lead length: {lead_length} of {len(lead_lengths)}')
             actuals = self.label_data(int(lead_length - 1))
             if subset is None:
                 actuals = actuals.withColumn('subset', actuals[self.test_col] &
@@ -472,7 +474,7 @@ class SurvivalModeler(Modeler):
         metrics = pd.DataFrame(metrics, index=lead_lengths)
         metrics.index.name = "Lead Length"
         metrics["Other Metrics:"] = ""
-        #Removed concordance index functionality for now
+        # Removed concordance index functionality for now
         metrics = metrics.dropna()
         return metrics
 
