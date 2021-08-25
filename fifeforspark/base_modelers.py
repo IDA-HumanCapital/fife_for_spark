@@ -19,7 +19,7 @@ spark = SparkSession.builder.getOrCreate()
 
 
 def default_subset_to_all(    
-    subset: Union[None, pd.core.series.Series], data: pyspark.sql.DataFrame
+    subset: Union[None, pyspark.sql.column.Column], data: pyspark.sql.DataFrame
 ) -> pyspark.sql.DataFrame:
     """
     Map an unspecified subset to an entirely True boolean mask.
