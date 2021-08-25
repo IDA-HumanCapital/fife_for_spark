@@ -449,6 +449,7 @@ class SurvivalModeler(Modeler):
         lead_lengths = np.arange(self.n_intervals) + 1
         metrics = []
         for lead_length in lead_lengths:
+            print(f'Now evaluating lead length: {lead_length} of {len(lead_lengths)}')
             actuals = self.label_data(int(lead_length - 1))
             if subset is None:
                 actuals = actuals.withColumn('subset', actuals[self.test_col] &
