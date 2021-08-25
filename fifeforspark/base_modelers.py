@@ -432,7 +432,7 @@ class SurvivalModeler(Modeler):
             outcome of True, and all elements of the confusion matrix. Also
             includes concordance index over the restricted mean survival time.
         """
-
+        min_val = 0
         if subset is None:
             filtered = self.data.filter(self.data[self.test_col])
             min_val = filtered.select(self.data[self.period_col]).agg(
