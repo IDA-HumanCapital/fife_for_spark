@@ -19,7 +19,7 @@ spark = SparkSession.builder.getOrCreate()
 
 
 def default_subset_to_all(    
-    subset: Union[None, pd.core.series.Series], data: pyspark.sql.DataFrame
+    subset: Union[None, pyspark.sql.DataFrame], data: pyspark.sql.DataFrame
 ) -> pyspark.sql.DataFrame:
     """
     Map an unspecified subset to an entirely True boolean mask.
@@ -31,7 +31,7 @@ def default_subset_to_all(
     Returns:
         Original subset argument if not none, otherwise a new boolean mask that is always True.
     """
-
+    assert len(subset.columns) == 1, "Provided subset is not a valid one-column subset"
     if subset is None:
         return data.withColumn('True_mask', lit(True)).select('True_mask')
     return subset
@@ -229,7 +229,7 @@ class Modeler(ABC):
 
     @abstractmethod
     def predict(
-        self, subset: Union[None, pyspark.sql.column.Column] = None, cumulative: bool = True
+        self, subset: Union[None, pyspark.sql.DataFrame] = None, cumulative: bool = True
     ) -> pyspark.sql.DataFrame:
         """
         Use trained model to produce observation survival probabilities.
@@ -245,7 +245,7 @@ class Modeler(ABC):
     @abstractmethod
     def evaluate(
         self,
-        subset: Union[None, pyspark.sql.column.Column] = None,
+        subset: Union[None, pyspark.sql.DataFrame] = None,
         threshold_positive: Union[None, str, float] = 0.5,
         share_positive: Union[None, str, float] = None,
     ) -> pd.core.frame.DataFrame:
@@ -403,7 +403,7 @@ class SurvivalModeler(Modeler):
 
     def evaluate(
         self,
-        subset: Union[None, pyspark.sql.column.Column] = None,
+        subset: Union[None, pyspark.sql.DataFrame] = None,
         threshold_positive: Union[None, str, float] = 0.5,
         share_positive: Union[None, str, float] = None,
     ) -> pd.core.frame.DataFrame:
@@ -435,10 +435,13 @@ class SurvivalModeler(Modeler):
         min_val = filtered.select(self.data[self.period_col]).agg(
             {self.period_col: 'min'}).first()[0]
         if subset is None:
-            subset = self.data.select(self.data[self.test_col] & 
-                (self.data[self.period_col] == min_val))
             self.data = self.data.withColumn('subset', self.data[self.test_col] & 
                 (self.data[self.period_col] == min_val))
+        else:
+            self.data = self.data.to_koalas()
+            self.data['subset'] = subset.to_koalas()[list(subset.columns)[0]]
+            self.data = self.data.to_spark()
+
         predictions = self.predict(
             subset=self.data['subset'], cumulative=(not self.allow_gaps))
         lead_lengths = np.arange(self.n_intervals) + 1

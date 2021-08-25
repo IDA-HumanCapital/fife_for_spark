@@ -74,7 +74,7 @@ class LGBModeler(Modeler):
     def train(
             self,
             params: Union[None, dict] = None,
-            subset: Union[None, pyspark.sql.column.Column] = None
+            subset: Union[None, pyspark.sql.DataFrame] = None
     ) -> List[pyspark.ml.pipeline.PipelineModel]:
         """
         Train a LightGBM model for each lead length.
@@ -102,7 +102,7 @@ class LGBModeler(Modeler):
             self,
             time_horizon: int,
             params: Union[None, dict] = None,
-            subset: Union[None, pyspark.sql.column.Column] = None
+            subset: Union[None, pyspark.sql.DataFrame] = None
     ) -> pyspark.ml.pipeline.PipelineModel:
         """
         Train a LightGBM model for a single lead length.
@@ -124,6 +124,13 @@ class LGBModeler(Modeler):
             }
         if subset is None:
             subset = ~self.data[self.test_col] & ~self.data[self.predict_col]
+        else:
+            self.data = self.data.to_koalas()
+            self.data['subset'] = subset.to_koalas()[list(subset.columns)[0]]
+            self.data = self.data.to_spark()
+            subset = self.data['subset']
+            self.data = self.data.drop('subset')
+
         data = self.label_data(time_horizon)
         data = data.filter(subset)
         data = self.subset_for_training_horizon(data, time_horizon)
@@ -147,7 +154,7 @@ class LGBModeler(Modeler):
         return model
 
     def predict(
-            self, subset: Union[None, pyspark.sql.column.Column] = None, cumulative: bool = True
+            self, subset: Union[None, pyspark.sql.DataFrame] = None, cumulative: bool = True
     ) -> pyspark.sql.DataFrame:
         """Use trained LightGBM models to predict the outcome for each observation and time horizon.
 
@@ -164,7 +171,12 @@ class LGBModeler(Modeler):
             length.
         """
         subset = default_subset_to_all(subset, self.data)
-        predict_data = self.data.filter(subset)[self.categorical_features + self.numeric_features]
+
+        self.data = self.data.to_koalas()
+        self.data['subset'] = subset.to_koalas()[list(subset.columns)[0]]
+        self.data = self.data.to_spark()
+
+        predict_data = self.data.filter(self.data['subset'])[self.categorical_features + self.numeric_features]
 
         firstelement = udf(lambda v: float(v[0]), FloatType())
         first_model = self.model[0]
