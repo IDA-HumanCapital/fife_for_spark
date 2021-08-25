@@ -474,7 +474,7 @@ class SurvivalModeler(Modeler):
         metrics = pd.DataFrame(metrics, index=lead_lengths)
         metrics.index.name = "Lead Length"
         metrics["Other Metrics:"] = ""
-        #Removed concordance index functionality for now
+        # Removed concordance index functionality for now
         metrics = metrics.dropna()
         return metrics
 
