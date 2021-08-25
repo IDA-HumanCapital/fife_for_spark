@@ -449,8 +449,14 @@ class SurvivalModeler(Modeler):
         metrics = []
         for lead_length in lead_lengths:
             actuals = self.label_data(int(lead_length - 1))
-            actuals = actuals.withColumn('subset', actuals[self.test_col] & 
-                (actuals[self.period_col] == min_val))
+            if subset is None:
+                actuals = actuals.withColumn('subset', actuals[self.test_col] &
+                                             (actuals[self.period_col] == min_val))
+            else:
+                actuals = actuals.to_koalas()
+                actuals['subset'] = subset.to_koalas()[list(subset.columns)[0]]
+                actuals = actuals.to_spark()
+
             actuals = actuals.filter(actuals.subset)
             actuals = actuals.filter(actuals[self.max_lead_col] >= int(lead_length))
             actuals = actuals.select(actuals["_label"].alias('actuals'))
