@@ -57,6 +57,8 @@ def compute_metrics_for_binary_outcomes(
     num_true = actuals.agg({'actuals': 'sum'}).first()[0]
     total = actuals.count()
     metrics = OrderedDict()
+    if num_true is None:
+        num_true = 0
     if (num_true > 0) & (num_true < total):
         predictions = predictions.withColumn(
             "row_id", monotonically_increasing_id())
@@ -173,6 +175,8 @@ class Modeler(ABC):
                 between the period of observations and the last period of the
                 given time horizon.
         """
+        ks.set_option('compute.ops_on_diff_frames', True)
+        
         if (config.get("time_identifier", "") == "") and data is not None:
             config["time_identifier"] = data.columns[1]
 
@@ -431,21 +435,26 @@ class SurvivalModeler(Modeler):
         min_val = filtered.select(self.data[self.period_col]).agg(
             {self.period_col: 'min'}).first()[0]
         if subset is None:
-            subset = self.data[self.test_col] & self.data.select(
-                self.data[self.period_col] == min_val)
+            subset = self.data.select(self.data[self.test_col] & 
+                (self.data[self.period_col] == min_val))
+            self.data = self.data.withColumn('subset', self.data[self.test_col] & 
+                (self.data[self.period_col] == min_val))
         predictions = self.predict(
-            subset=subset, cumulative=(not self.allow_gaps))
+            subset=self.data['subset'], cumulative=(not self.allow_gaps))
         lead_lengths = np.arange(self.n_intervals) + 1
         metrics = []
         for lead_length in lead_lengths:
-            actuals = self.label_data(lead_length - 1).filter(subset)
-            actuals = actuals.filter(actuals[self.max_lead_col] >= lead_length)
-            actuals = actuals.select(actuals["_label"])
+            actuals = self.label_data(int(lead_length - 1))
+            actuals = actuals.withColumn('subset', actuals[self.test_col] & 
+                (actuals[self.period_col] == min_val))
+            actuals = actuals.filter(actuals.subset)
+            actuals = actuals.filter(actuals[self.max_lead_col] >= int(lead_length))
+            actuals = actuals.select(actuals["_label"].alias('actuals'))
             metrics.append(
                 compute_metrics_for_binary_outcomes(
                     actuals,
                     predictions.select(
-                        predictions[lead_length - 1]).limit(actuals.count()),
+                        predictions[int(lead_length - 1)].alias('predictions')).limit(actuals.count()),
                     threshold_positive=threshold_positive,
                     share_positive=share_positive,
                 )
@@ -453,16 +462,7 @@ class SurvivalModeler(Modeler):
         metrics = pd.DataFrame(metrics, index=lead_lengths)
         metrics.index.name = "Lead Length"
         metrics["Other Metrics:"] = ""
-        if (not self.allow_gaps) and (self.weight_col is None):
-            concordance_index_value = concordance_index(
-                self.data[subset][[self.duration_col,
-                                   self.max_lead_col]].min(axis=1),
-                np.sum(predictions, axis=-1),
-                self.data[subset][self.event_col],
-            )
-            metrics["C-Index"] = np.where(
-                metrics.index == 1, concordance_index_value, ""
-            )
+        #Removed concordance index functionality for now
         metrics = metrics.dropna()
         return metrics
 
@@ -478,10 +478,12 @@ class SurvivalModeler(Modeler):
         forecasts = self.predict(
             subset=self.data[self.predict_col], cumulative=(not self.allow_gaps))
         forecasts = forecasts.to_koalas()
-        index = self.data.filter(self.data[self.predict_col]).select(
-            self.data[self.config["individual_identifier"]])
+        #index = list(self.data.filter(self.data[self.predict_col]).select(
+        #    self.config["individual_identifier"]).toPandas())
+        #print(len(index))
         forecasts.columns = columns
-        forecasts['index'] = index
+        #print(forecasts.size)
+        #forecasts['index'] = index
         return forecasts
 
     def subset_for_training_horizon(self, data: pyspark.sql.DataFrame, time_horizon: int) -> pyspark.sql.DataFrame:

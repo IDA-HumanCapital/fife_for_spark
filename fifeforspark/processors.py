@@ -209,16 +209,15 @@ class PanelDataProcessor(DataProcessor):
         ks_df = ks.DataFrame(self.data)
         ks_df['_period'] = ks_df[self.config['time_identifier']].factorize(sort=True)[
             0]
-        ks_df["_predict_obs"] = ks_df["_period"] == ks_df["_period"].max()
         self.data = ks_df.to_spark()
 
         max_val = lit(self.data.agg({'_period': 'max'}).first()[0])
         self.data = self.data.withColumn(
-            '_period_obs', self.data['_period'] == max_val)
+            '_predict_obs', self.data['_period'] == max_val)
 
         max_test_intervals = int(
             (self.data.select('_period').distinct().count() - 1) / 2)
-        if self.config.get('test_intervals', 0) > max_test_intervals:
+        if self.config.get('test_intervals', -1) > max_test_intervals:
             warn(
                 f"The specified value for TEST_INTERVALS was too high and will not allow for enough training periods. It was automatically reduced to {max_test_intervals}"
             )

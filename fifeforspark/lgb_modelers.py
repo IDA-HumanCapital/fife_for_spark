@@ -6,10 +6,11 @@ import mmlspark.lightgbm.LightGBMClassifier as lgb
 import pyspark.sql
 from pyspark.ml import Pipeline
 from pyspark.ml.feature import VectorAssembler, StringIndexer
-from pyspark.sql.functions import udf, date_format
+from pyspark.sql.functions import udf, date_format, col
 from pyspark.sql.types import FloatType
 from fifeforspark.base_modelers import default_subset_to_all, Modeler, SurvivalModeler
-
+import databricks.koalas as ks
+ks.set_option('compute.ops_on_diff_frames', True)
 
 class LGBModeler(Modeler):
     """Train a gradient-boosted tree model for each lead length using MMLSpark's LightGBM.
@@ -169,17 +170,14 @@ class LGBModeler(Modeler):
         first_model = self.model[0]
         predictions = first_model.transform(predict_data).selectExpr('probability as probability_1')
         predictions = predictions.withColumn('probability_1', firstelement(predictions['probability_1']))
+        predictions = predictions.to_koalas()
         for i, lead_specific_model in enumerate(self.model):
             if i != 0:
                 pred_year = lead_specific_model.transform(predict_data).selectExpr(f'probability as probability_{i+1}')
-
-                predictions = predictions.withColumn(f'probability_{i+1}',
-                                                     firstelement(pred_year[f'probability_{i+1}']))
+                predictions[f'probability_{i+1}'] = pred_year.select(firstelement(pred_year[f'probability_{i+1}'])).to_koalas()
                 if cumulative:
-                    predictions = predictions.withColumn(f'probability_{i + 1}',
-                                                         predictions[f'probability_{i + 1}'] *
-                                                         predictions[f'probability_{i}'])
-        return predictions
+                    predictions[f'probability_{i + 1}'] = predictions[f'probability_{i + 1}'] * predictions[f'probability_{i}']
+        return predictions.to_spark()
 
     def transform_features(self) -> pyspark.sql.DataFrame:
         """
@@ -190,17 +188,17 @@ class LGBModeler(Modeler):
         """
         data = self.data
         date_cols = [x for x, y in data.dtypes if y in ['date', 'timestamp']]
-        for col in date_cols:
-            data = data.withColumn(col,
-                                   10000*date_format(data[col], "y") +
-                                   100*date_format(data[col], "M") +
-                                   date_format(data[col], "d"))
+        for date_col in date_cols:
+            data = data.withColumn(date_col,
+                                   10000*date_format(data[date_col], "y") +
+                                   100*date_format(data[date_col], "M") +
+                                   date_format(data[date_col], "d"))
         return data
 
-    def save_model(self, file_name: str = "GBT_Model", path: str = "") -> None:
+    def save_model(self, path: str = "") -> None:
         """
         Save the horizon-specific LightGBM models that comprise the model to disk.
-        Functionality does not currently exist
+        Functionality currently in progress.
 
         Args:
             file_name: The desired name of the model on disk
@@ -209,7 +207,8 @@ class LGBModeler(Modeler):
         Returns:
             None
         """
-        pass
+        for model in lgb.model:
+            model.write().overwrite().save(path)
 
 
 class LGBSurvivalModeler(LGBModeler, SurvivalModeler):
