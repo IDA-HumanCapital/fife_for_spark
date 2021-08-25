@@ -31,9 +31,10 @@ def default_subset_to_all(
     Returns:
         Original subset argument if not none, otherwise a new boolean mask that is always True.
     """
-    assert len(subset.columns) == 1, "Provided subset is not a valid one-column subset"
     if subset is None:
         return data.withColumn('True_mask', lit(True)).select('True_mask')
+    else:
+        assert len(subset.columns) == 1, "Provided subset is not a valid one-column subset"
     return subset
 
 
@@ -443,7 +444,7 @@ class SurvivalModeler(Modeler):
             self.data = self.data.to_spark()
 
         predictions = self.predict(
-            subset=self.data['subset'], cumulative=(not self.allow_gaps))
+            subset=self.data.select('subset'), cumulative=(not self.allow_gaps))
         lead_lengths = np.arange(self.n_intervals) + 1
         metrics = []
         for lead_length in lead_lengths:
