@@ -488,7 +488,7 @@ class SurvivalModeler(Modeler):
         columns = [
             str(i + 1) + "-period Survival Probability" for i in range(self.n_intervals)]
         forecasts = self.predict(
-            subset=self.data[self.predict_col], cumulative=(not self.allow_gaps))
+            subset=self.data.select(self.predict_col), cumulative=(not self.allow_gaps))
         forecasts = forecasts.to_koalas()
         #index = list(self.data.filter(self.data[self.predict_col]).select(
         #    self.config["individual_identifier"]).toPandas())
