@@ -444,7 +444,7 @@ class SurvivalModeler(Modeler):
             self.data = self.data.to_spark()
 
         predictions = self.predict(
-            subset=self.data['subset'], cumulative=(not self.allow_gaps))
+            subset=self.data.select('subset'), cumulative=(not self.allow_gaps))
         lead_lengths = np.arange(self.n_intervals) + 1
         metrics = []
         for lead_length in lead_lengths:
