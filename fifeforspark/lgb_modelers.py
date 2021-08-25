@@ -178,15 +178,15 @@ class LGBModeler(Modeler):
 
         predict_data = self.data.filter(self.data['subset'])[self.categorical_features + self.numeric_features]
 
-        firstelement = udf(lambda v: float(v[0]), FloatType())
+        secondelement = udf(lambda v: float(v[1]), FloatType())
         first_model = self.model[0]
         predictions = first_model.transform(predict_data).selectExpr('probability as probability_1')
-        predictions = predictions.withColumn('probability_1', firstelement(predictions['probability_1']))
+        predictions = predictions.withColumn('probability_1', secondelement(predictions['probability_1']))
         predictions = predictions.to_koalas()
         for i, lead_specific_model in enumerate(self.model):
             if i != 0:
                 pred_year = lead_specific_model.transform(predict_data).selectExpr(f'probability as probability_{i+1}')
-                predictions[f'probability_{i+1}'] = pred_year.select(firstelement(pred_year[f'probability_{i+1}'])).to_koalas()
+                predictions[f'probability_{i+1}'] = pred_year.select(secondelement(pred_year[f'probability_{i+1}'])).to_koalas()
                 if cumulative:
                     predictions[f'probability_{i + 1}'] = predictions[f'probability_{i + 1}'] * predictions[f'probability_{i}']
         return predictions.to_spark()
