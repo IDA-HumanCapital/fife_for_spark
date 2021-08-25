@@ -147,7 +147,7 @@ class LGBModeler(Modeler):
         return model
 
     def predict(
-            self, subset: Union[None, pyspark.sql.column.Column] = None, cumulative: bool = True
+            self, subset: Union[None, pyspark.sql.DataFrame] = None, cumulative: bool = True
     ) -> pyspark.sql.DataFrame:
         """Use trained LightGBM models to predict the outcome for each observation and time horizon.
 
@@ -164,7 +164,12 @@ class LGBModeler(Modeler):
             length.
         """
         subset = default_subset_to_all(subset, self.data)
-        predict_data = self.data.filter(subset)[self.categorical_features + self.numeric_features]
+
+        self.data = self.data.to_koalas()
+        self.data['subset'] = subset.to_koalas()[list(subset.columns)[0]]
+        self.data = self.data.to_spark()
+
+        predict_data = self.data.filter(self.data['subset'])[self.categorical_features + self.numeric_features]
 
         firstelement = udf(lambda v: float(v[0]), FloatType())
         first_model = self.model[0]
