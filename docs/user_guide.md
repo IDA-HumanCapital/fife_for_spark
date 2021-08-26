@@ -1,6 +1,6 @@
 ## Quick Start
 
-The Finite-Interval Forecasting Engine for Spark (FIFEforSpark) is an adaptation of the Finite-Interval Forecasting Engine for the Apache Spark environment. Currently, it provides machine learning models, specifically a gradient boosted tree model, for discrete-time survival analysis. We will show you here how to build your own model pipeline in Python, but you can also use the pre-created functionality in [Command Line](cli.md). You can also see a full example that uses the [Rulers, Elections, and Irregular Governance dataset (REIGN)](https://oefdatascience.github.io/REIGN.github.io/) in this notebook.
+The Finite-Interval Forecasting Engine for Spark (FIFEforSpark) is an adaptation of the Finite-Interval Forecasting Engine for the Apache Spark environment. Currently, it provides machine learning models, specifically a gradient boosted tree model, for discrete-time survival analysis. We will show you here how to build your own model pipeline in Python. Soon, we will be able to also use the pre-created functionality in the command line. You can also see a full example that uses the [Rulers, Elections, and Irregular Governance dataset (REIGN)](https://oefdatascience.github.io/REIGN.github.io/) in this notebook.
 
 ### Installation
 
