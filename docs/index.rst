@@ -18,9 +18,8 @@ Python User Guide
    :maxdepth: 2
 
    user_guide
-   cli
    spark_help
-   
+
    Modules <source/fifeforspark>
 
 
@@ -54,7 +53,6 @@ Contact Information
 
 :IDA development team: humancapital@ida.org
 :IDA Principal Investigator: Dr. James Bishop, jbishop@ida.org
-
 
 
 
