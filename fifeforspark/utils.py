@@ -155,60 +155,60 @@ class FIFEArgParser(argparse.ArgumentParser):
     def __init__(self):
         super().__init__()
         self.add_argument(
-            "--seed",
+            "--SEED",
             type=int,
             default=9999,
             help="The initializing value for all random number generators.",
         )
         self.add_argument(
-            "--individual_identifier",
+            "--INDIVIDUAL_IDENTIFIER",
             type=str,
             help="The name of the feature that identifies individuals that persist over multiple time periods in the data.",
         )
         self.add_argument(
-            "--time_identifier",
+            "--TIME_IDENTIFIER",
             type=str,
             help="The name of the feature that identifies time periods in the data.",
         )
         self.add_argument(
-            "--categorical_suffixes",
+            "--CATEGORICAL_SUFFIXES",
             type=str,
             nargs="+",
             help="Optional list of suffixes denoting that columns ending with such a suffix should be treated as categorical.",
         )
         self.add_argument(
-            "--max_null_share",
+            "--MAX_NULL_SHARE",
             type=float,
             help="The maximum share of observations that may have a null value for a feature to be kept for training.",
         )
         self.add_argument(
-            "--max_unique_categories",
+            "--MAX_UNIQUE_CATEGORIES",
             type=int,
             help="The maximum number of unique values for a feature of a numeric type to be considered categorical.",
         )
         self.add_argument(
-            "--numeric_suffixes",
+            "--NUMERIC_SUFFIXES",
             type=str,
             nargs="+",
             help="Optional list of suffixes denoting that columns ending with such a suffix should be treated as numeric.",
         )
         self.add_argument(
-            "--test_intervals",
+            "--TEST_INTERVALS",
             type=int,
             help="The number of most recent periods to treat as absent from the data during training for the purpose of model evaluation.",
         )
         self.add_argument(
-            "--validation_share",
+            "--VALIDATION_SHARE",
             type=float,
             help="The share of observations used for evaluation instead of training for hyperoptimization or early stopping.",
         )
         self.add_argument(
-            "--max_epochs",
+            "--MAX_EPOCHS",
             type=int,
             help="If HYPER_TRIALS is zero, the maximum number of passes through the training set.",
         )
         self.add_argument(
-            "--min_survivors_in_train",
+            "--MIN_SURVIVOR_IN_TRAIN",
             type=int,
             help="The minimum number of training set observations surviving a given time horizon for the model to be trained to make predictions for that time horizon.",
         )
