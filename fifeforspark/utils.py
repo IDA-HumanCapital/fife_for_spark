@@ -9,7 +9,7 @@ import random as rn
 import argparse
 
 
-def create_example_data1(n_persons: int = 3, n_periods: int = 12
+def create_example_data1(n_persons: int = 3, n_periods: int = 12, seed_value: int = 9999
 ) -> pyspark.sql.DataFrame:
     """
     Create example data for testing FIFE
@@ -17,6 +17,7 @@ def create_example_data1(n_persons: int = 3, n_periods: int = 12
     Args:
         n_persons: the number of people to be in the dataset
         n_periods: the number of periods to be in the dataset
+        seed_value: seed for random value generation
 
     Returns:
         Spark dataframe with example data
@@ -33,31 +34,31 @@ def create_example_data1(n_persons: int = 3, n_periods: int = 12
     values = spark.createDataFrame([], schema)
     for i in np.arange(n_persons):
             period = np.random.randint(n_periods)+1 #Sparkify this
-            rdd1 = RandomRDDs.uniformRDD(spark,size = 1, seed = 9999)
+            rdd1 = RandomRDDs.uniformRDD(spark,size = 1, seed = seed_value)
             x_1 = rdd1.first()
 
             obj1 = spark.sparkContext.parallelize(["A","B","C"])
-            x_2 = obj1.takeSample(False, 1, seed = 9999)[0]
+            x_2 = obj1.takeSample(False, 1, seed = seed_value)[0]
 
-            rdd3 = RandomRDDs.uniformRDD(spark, size = 1, seed = 9999).map(lambda v: 1 + v)
+            rdd3 = RandomRDDs.uniformRDD(spark, size = 1, seed = seed_value).map(lambda v: 1 + v)
             x_3 = rdd3.first()
 
             obj2 = spark.sparkContext.parallelize(["a","b","c", 1, 2, 3, np.nan])
-            x_4 = obj2.takeSample(False, 1, seed = 9999)[0]
+            x_4 = obj2.takeSample(False, 1, seed = seed_value)[0]
             while period <= n_periods:
                     print(period)
                     values = values.union(spark.createDataFrame([(int(i), period, x_1, x_2, x_3, x_4)]))
                     if x_2 == 'A':
-                        unif_point1 = RandomRDDs.uniformRDD(spark, size = 1, seed = 9999).map(lambda v: (.1) * v)
+                        unif_point1 = RandomRDDs.uniformRDD(spark, size = 1, seed = seed_value).map(lambda v: (.1) * v)
                         x_1 += unif_point1.first()
                     else:
-                        unif_point2 = RandomRDDs.uniformRDD(spark, size = 1, seed = 9999).map(lambda v: (.2) * v)
+                        unif_point2 = RandomRDDs.uniformRDD(spark, size = 1, seed = seed_value).map(lambda v: (.2) * v)
                         x_1 += unif_point2.first()
                     if x_1 > np.sqrt(x_3):
                         break
                     if x_4 in obj2.take(5):
                         x_4_transition_value = obj2.collect()[obj2.collect().index(x_4) + 1] #Remove all these collects
-                        if RandomRDDs.uniformRDD(spark, size = 1, seed = 9999).first() >= 0.75:
+                        if RandomRDDs.uniformRDD(spark, size = 1, seed = seed_value).first() >= 0.75:
                             x_4 = x_4_transition_value 
                             del x_4_transition_value
                     period += 1
@@ -65,7 +66,7 @@ def create_example_data1(n_persons: int = 3, n_periods: int = 12
     return values
 
 def create_example_data2(
-    n_persons: int = 8192, n_periods: int = 20
+    n_persons: int = 8192, n_periods: int = 20, seed_value:int = 9999
 ) -> pyspark.sql.DataFrame:
     """
     Fabricate an unbalanced panel dataset suitable as FIFE input.
@@ -73,6 +74,7 @@ def create_example_data2(
     Args:
         n_persons: the number of people to be in the dataset
         n_periods: the number of periods to be in the dataset
+        seed_value: seed for random value generation
 
     Returns:
         Spark dataframe with example data
@@ -80,7 +82,7 @@ def create_example_data2(
     """
     findspark.init()
     spark = SparkSession.builder.getOrCreate()
-    seed = 9999
+    seed = seed_value
     np.random.seed(seed)
     values = []
     for i in np.arange(n_persons):
@@ -157,7 +159,7 @@ class FIFEArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--SEED",
             type=int,
-            default=9999,
+            default=seed_value,
             help="The initializing value for all random number generators.",
         )
         self.add_argument(
