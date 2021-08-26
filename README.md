@@ -1,4 +1,6 @@
-The Finite-Interval Forecasting Engine (FIFE) provides machine learning and other models for discrete-time survival analysis and multivariate time series forecasting.
+The Finite-Interval Forecasting Engine for Spark (FIFEforSpark) is an adaptation of the Finite-Interval Forecasting Engine for the Apache Spark environment. Currently, it provides machine learning models, specifically a gradient boosted tree model, for discrete-time survival analysis.
+
+If you are already familiar with FIFE, you'll recognize the following explanation of how FIFEforSpark approaches survival analysis. Many of the sections were borrowed heavily from FIFE as this is merely an adaptation of the package to the Spark environment with the exact same methodology. If you would like more information on FIFE, you can read the documentation [here](https://fife.readthedocs.io/en/latest).
 
 Suppose you have a dataset that looks like this:
 
@@ -20,24 +22,25 @@ Suppose you have a dataset that looks like this:
 
 The entities with IDs 0, 2, and 4 are observed in the dataset in 2019.
 
-* What are each of their probabilities of being observed in 2020? 2021? 2022?
-* Given that they will be observed, what will be the value of feature_1? feature_3?
-* Suppose entities can exit the dataset under a variety of circumstances. If entities 0, 2, or 4 exit in a given year, what will their circumstances be?
-* How reliable can we expect these forecasts to be?
-* How do the values of the features inform these forecasts?
+While FIFE offers a significantly larger suite of models designed to answer a variety of questions, FIFEforSpark is mainly focused on one question: what are each of their probabilities of being observed in any future year? Fortunately, FIFEforSpark can estimate answers to these questions for any unbalanced panel dataset.
 
-FIFE can estimate answers to these questions for any unbalanced panel dataset.
+Exactly like FIFE, FIFEforSpark unifies survival analysis and multivariate time series analysis. Tools for the former neglect future states of survival; tools for the latter neglect the possibility of discontinuation. Traditional forecasting approaches for each, such as proportional hazards and vector autoregression (VAR), respectively, impose restrictive functional forms that limit forecasting performance. FIFEforSpark supports one of the best approaches for maximizing forecasting performance: gradient-boosted trees (using MMLSpark's LightGBM).
 
-FIFE unifies survival analysis (including competing risks) and multivariate time series analysis. Tools for the former neglect future states of survival; tools for the latter neglect the possibility of discontinuation. Traditional forecasting approaches for each, such as proportional hazards and vector autoregression (VAR), respectively, impose restrictive functional forms that limit forecasting performance. FIFE supports *the* state-of-the-art approaches for maximizing forecasting performance: gradient-boosted trees (using LightGBM) and neural networks (using Keras).
+FIFEforSpark is simple to use and the syntax is almost identical to that of FIFE; however, given that this is meant to be run in the Spark environment in a Python notebook, there are some notable differences. First, the package 'mmlspark' must already be installed and attached to the cluster. Unfortunately, the PyPI version of MMLSpark is not compatible with FIFEforSpark. As such, FIFE is best utilized in a Databricks notebook.  
 
-FIFE is simple to use:
+If you are working in a Python IDE and have pyspark installed, you can run the following. Again, the PyPI version of MMLSpark is not complete and will cause this code to fail; however, if MMLSpark is installed correctly, the following code should work.
 
 ```python
-from fife.processors import PanelDataProcessor
-from fife.lgb_modelers import LGBSurvivalModeler
-import pandas as pd
+import findspark
+findspark.init()
+import pyspark # only run after findspark.init()
+from pyspark.sql import SparkSession
 
-data_processor = PanelDataProcessor(data=pd.read_csv(path_to_your_data))
+from fifeforspark.processors import PanelDataProcessor
+from fifeforspark.lgb_modelers import LGBSurvivalModeler
+
+spark = SparkSession.builder.getOrCreate()
+data_processor = PanelDataProcessor(data=spark.read.csv(path_to_your_data))
 data_processor.build_processed_data()
 
 modeler = LGBSurvivalModeler(data=data_processor.data)
@@ -46,10 +49,21 @@ modeler.build_model()
 forecasts = modeler.forecast()
 ```
 
-Want to forecast future states, too? Just replace `LGBSurvivalModeler` with `LGBStateModeler` and specify the column you'd like to forecast with the `state_col` argument.
+If you are working in a Databricks python notebook, you may run something like the following code, where 'your_table' is the name of your table.
 
-Want to forecast circumstances of exit ("competing risks")? Try `LGBExitModeler` with the `exit_col` argument instead.
+```python
+from fifeforspark.processors import PanelDataProcessor
+from fifeforspark.lgb_modelers import LGBSurvivalModeler
 
-Here's a [guided example notebook](https://nbviewer.jupyter.org/github/IDA-HumanCapital/fife/blob/master/examples/country_leadership.ipynb) with real data, where we forecast when world leaders will lose power.
+data_processor = PanelDataProcessor(data = spark.sql("select * from your_table"))
+data_processor.build_processed_data()
 
-You can read the documentation for FIFE [here](https://fife.readthedocs.io/en/latest).
+modeler = LGBSurvivalModeler(data=data_processor.data)
+modeler.build_model()
+
+forecasts = modeler.forecast()
+```
+
+Here's a notebook with real data, where we forecast when world leaders will lose power.
+
+If you would like more information on FIFEforSpark, you can read the documentation here.
