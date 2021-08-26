@@ -6,12 +6,10 @@ m2r
 
 # install
 ipython
-keras
-lifelines
-lightgbm
-matplotlib
+findspark
+pyspark
+mmlspark
+databricks
+koalas
 numpy
 pandas
-shap
-scikit-learn
-tensorflow
