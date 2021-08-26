@@ -23,11 +23,11 @@ class DataProcessor:
         """
         findspark.init()
         self.spark = SparkSession.builder.getOrCreate()
-        if (config.get("individual_identifier", "") == "") and data is not None:
-            config["individual_identifier"] = data.columns[0]
+        if (config.get("INDIVIDUAL_IDENTIFIER", "") == "") and data is not None:
+            config["INDIVIDUAL_IDENTIFIER"] = data.columns[0]
             print(
                 "Individual identifier column name not given; assumed to be "
-                f'leftmost column ({config["individual_identifier"]})'
+                f'leftmost column ({config["INDIVIDUAL_IDENTIFIER"]})'
             )
         self.config = config
         self.data = data
@@ -61,7 +61,7 @@ class DataProcessor:
         """
         if self.data.select(
                 isnan(col).cast('integer').alias(col)
-        ).agg({col: 'mean'}).first()[0] >= self.config.get('max_null_share', 0.999):
+        ).agg({col: 'mean'}).first()[0] >= self.config.get('MAX_NULL_SHARE', 0.999):
             return True
         if self.data.select(col).distinct().count() < 2:
             return True
@@ -77,8 +77,8 @@ class DataProcessor:
         Returns:
             Boolean value for whether the column is categorical
         """
-        if col.endswith(self.config.get('categorical_suffixes', ())):
-            if col.endswith(self.config.get('numerical_suffixes', ())):
+        if col.endswith(self.config.get('CATEGORICAL_SUFFIXES', ())):
+            if col.endswith(self.config.get('NUMERIC_SUFFIXES', ())):
                 print(
                     f"{col} matches both categorical and numerical suffixes; it will be identified as categorical"
                 )
@@ -87,7 +87,7 @@ class DataProcessor:
             return False
         if not isinstance(self.data.schema[col].dataType, (IntegerType, LongType, ShortType,
                                                            ByteType, FloatType, DoubleType, DecimalType)):
-            if col.endswith(self.config.get('numerical_suffixes', ())):
+            if col.endswith(self.config.get('NUMERIC_SUFFIXES', ())):
                 print(
                     f"{col} matches numeric suffix but is non-numeric; identified as categorical"
                 )
@@ -95,8 +95,8 @@ class DataProcessor:
         if isinstance(self.data.schema[col].dataType, (IntegerType, LongType, ShortType,
                                                        ByteType, FloatType, DoubleType, DecimalType)):
             return False
-        if (col.endswith(self.config.get('numerical_suffixes', ()))) or (
-                self.data.select(col).distinct().count() > self.config.get('max_unique_categories', 1024)):
+        if (col.endswith(self.config.get('NUMERIC_SUFFIXES', ()))) or (
+                self.data.select(col).distinct().count() > self.config.get('MAX_UNIQUE_CATEGORIES', 1024)):
             return False
         return True
 
@@ -125,11 +125,11 @@ class PanelDataProcessor(DataProcessor):
             data: A DataFrame to be processed.
         """
 
-        if (config.get("time_identifier", "") == "") and data is not None:
-            config["time_identifier"] = data.columns[1]
+        if (config.get("TIME_IDENTIFIER", "") == "") and data is not None:
+            config["TIME_IDENTIFIER"] = data.columns[1]
             print(
                 "Time identifier column name not given; assumed to be "
-                f'second-leftmost column ({config["time_identifier"]})'
+                f'second-leftmost column ({config["TIME_IDENTIFIER"]})'
             )
         super().__init__(config, data)
         self.spark.conf.set("spark.sql.shuffle.partitions", shuffle_parts)
@@ -141,10 +141,10 @@ class PanelDataProcessor(DataProcessor):
         Returns:
             None
         """
-        self.check_column_consistency(self.config['individual_identifier'])
-        self.check_column_consistency(self.config['time_identifier'])
+        self.check_column_consistency(self.config['INDIVIDUAL_IDENTIFIER'])
+        self.check_column_consistency(self.config['TIME_IDENTIFIER'])
         subset = self.data.select(
-            [self.config['individual_identifier'], self.config['time_identifier']])
+            [self.config['INDIVIDUAL_IDENTIFIER'], self.config['TIME_IDENTIFIER']])
         assert subset.count() == subset.dropDuplicates().count(
         ), "One or more individuals have multiple observations for a single time value."
 
@@ -158,7 +158,7 @@ class PanelDataProcessor(DataProcessor):
         Returns:
             Dataframe: dataframe with the processed column
         """
-        if colname == self.config['individual_identifier']:
+        if colname == self.config['INDIVIDUAL_IDENTIFIER']:
             return self.data
         if self.is_degenerate(col=colname):
             self.data = self.data.drop(colname)
@@ -187,15 +187,15 @@ class PanelDataProcessor(DataProcessor):
             Spark DataFrame with flagged validation individuals
         """
         unique_ids = self.data.select(
-            self.config['individual_identifier']).distinct()
+            self.config['INDIVIDUAL_IDENTIFIER']).distinct()
         total = unique_ids.count()
-        val_size = int(self.config.get('validation_share', 0.25) * total)
+        val_size = int(self.config.get('VALIDATION_SHARE', 0.25) * total)
         unique_ids = unique_ids.sample(True, val_size/total, seed=9999)
         unique_list = list(
-            unique_ids.select(self.config['individual_identifier']
-                              ).toPandas()[self.config['individual_identifier']])
+            unique_ids.select(self.config['INDIVIDUAL_IDENTIFIER']
+                              ).toPandas()[self.config['INDIVIDUAL_IDENTIFIER']])
         self.data = self.data.withColumn(
-            'val_flagged', self.data[self.config['individual_identifier']].isin(unique_list))
+            'val_flagged', self.data[self.config['INDIVIDUAL_IDENTIFIER']].isin(unique_list))
         return self.data
 
     def build_reserved_cols(self) -> pyspark.sql.DataFrame:
@@ -207,7 +207,7 @@ class PanelDataProcessor(DataProcessor):
         """
 
         ks_df = ks.DataFrame(self.data)
-        ks_df['_period'] = ks_df[self.config['time_identifier']].factorize(sort=True)[
+        ks_df['_period'] = ks_df[self.config['TIME_IDENTIFIER']].factorize(sort=True)[
             0]
         self.data = ks_df.to_spark()
 
@@ -217,14 +217,14 @@ class PanelDataProcessor(DataProcessor):
 
         max_test_intervals = int(
             (self.data.select('_period').distinct().count() - 1) / 2)
-        if self.config.get('test_intervals', -1) > max_test_intervals:
+        if self.config.get('TEST_INTERVALS', -1) > max_test_intervals:
             warn(
                 f"The specified value for TEST_INTERVALS was too high and will not allow for enough training periods. It was automatically reduced to {max_test_intervals}"
             )
-            self.config['test_intervals'] = max_test_intervals
+            self.config['TEST_INTERVALS'] = max_test_intervals
 
         self.data = self.data.withColumn(
-            '_test', (self.data['_period'] + self.config.get('test_intervals', 0)) >= max_val)
+            '_test', (self.data['_period'] + self.config.get('TEST_INTERVALS', 0)) >= max_val)
 
         self.data = self.flag_validation_individuals()
         self.data = self.data.withColumn(
@@ -239,7 +239,7 @@ class PanelDataProcessor(DataProcessor):
                 self.data.obs_max_period < max_val).cast('int'))
 
         period_window = Window.partitionBy(
-            self.config['individual_identifier']).orderBy('_period')
+            self.config['INDIVIDUAL_IDENTIFIER']).orderBy('_period')
         self.data = self.data.withColumn("prev_period", lag(
             self.data['_period']).over(period_window))
         self.data = self.data.withColumn(
@@ -249,12 +249,12 @@ class PanelDataProcessor(DataProcessor):
             "_spell", F.sum(self.data.gaps).over(period_window))
 
         duration_window = Window.partitionBy(
-            [self.config['individual_identifier'], '_spell']).orderBy("_period")
+            [self.config['INDIVIDUAL_IDENTIFIER'], '_spell']).orderBy("_period")
         self.data = self.data.withColumn('_duration', F.count(
             self.data['_spell']).over(duration_window))
 
         max_duration_window = Window.partitionBy(
-            [self.config['individual_identifier'], '_spell']).orderBy(col("_period").desc())
+            [self.config['INDIVIDUAL_IDENTIFIER'], '_spell']).orderBy(col("_period").desc())
         self.data = self.data.withColumn('max_duration', F.max(
             self.data['_duration']).over(max_duration_window))
         self.data = self.data.withColumn(
@@ -277,7 +277,7 @@ class PanelDataProcessor(DataProcessor):
             Sorted panel data
         """
 
-        return self.data.orderBy(F.asc(self.config['individual_identifier']), F.asc('_period'))
+        return self.data.orderBy(F.asc(self.config['INDIVIDUAL_IDENTIFIER']), F.asc('_period'))
 
     def build_processed_data(self):
         """
