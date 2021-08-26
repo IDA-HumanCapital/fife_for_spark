@@ -1,15 +1,5 @@
-# A Guide to Spark
 
 This document discusses all things Spark. The purpose of this document is to answer any and all questions [FIFE](https://github.com/IDA-HumanCapital/fife) users may have when transitioning to fifeforspark.
-
-
-
-**Table of Contents:**  
-* [What is Apache Spark?](#what-is-apache-spark)  
-* [What is PySpark?](#what-is-pyspark)  
-* [Spark and FIFE](#spark-and-fife)   
-* [How to download MMLSpark](#how-to-download-mmlspark) 
-* [Frequently Asked Questions (FAQs)](#frequently-asked-questions)  
 
 
 ## What is Apache Spark?
@@ -36,9 +26,11 @@ While there exists a PyPi page for MMLSpark and it is possible to pip install MM
 
 <br>
 
-To download the newest version of MMLSpark, we recommend that you utilize the newest Maven coordinates available on the [MMLSpark GitHub repository](https://github.com/microsoft/SynapseML). The README page on their GitHub contains both the current version number, and Maven coordinates (labeled as 'master version'). This is shown below:
+To download the newest version of MMLSpark, we recommend that you utilize the newest Maven coordinates available on the [MMLSpark GitHub repository](https://github.com/microsoft/SynapseML). The README page on their GitHub contains both the current version number, and Maven coordinates (labeled as 'master version'). This is shown below:   
 
-![Image](images/MMLSpark_Maven.PNG)
+
+![Image](images/MMLSpark_Maven.PNG)   
+
 
  In Databricks, initialize a new library within the Workspace and in the desired location. A guide for performing this can be observed from the following [link](https://docs.microsoft.com/en-us/azure/cognitive-services/big-data/getting-started#azure-databricks)<sup>6</sup>, but we also outline the process in the below steps:
 
