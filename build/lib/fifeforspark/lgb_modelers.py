@@ -119,7 +119,7 @@ class LGBModeler(Modeler):
             params = {
                 time_horizon: {
                     "objective": self.objective,
-                    "numIterations": self.config.get("max_epochs", 256),
+                    "numIterations": self.config.get("MAX_EPOCHS", 256),
                 }
             }
         if subset is None:

@@ -178,11 +178,11 @@ class Modeler(ABC):
         """
         ks.set_option('compute.ops_on_diff_frames', True)
         
-        if (config.get("time_identifier", "") == "") and data is not None:
-            config["time_identifier"] = data.columns[1]
+        if (config.get("TIME_IDENTIFIER", "") == "") and data is not None:
+            config["TIME_IDENTIFIER"] = data.columns[1]
 
-        if (config.get("individual_identifier", "") == "") and data is not None:
-            config["individual_identifier"] = data.columns[0]
+        if (config.get("INDIVIDUAL_IDENTIFIER", "") == "") and data is not None:
+            config["INDIVIDUAL_IDENTIFIER"] = data.columns[0]
 
         findspark.init()
         self.spark = SparkSession.builder.getOrCreate()
@@ -209,7 +209,7 @@ class Modeler(ABC):
             self.spell_col,
         ]
         if self.config:
-            self.reserved_cols.append(self.config["individual_identifier"])
+            self.reserved_cols.append(self.config["INDIVIDUAL_IDENTIFIER"])
         if self.weight_col:
             self.reserved_cols.append(self.weight_col)
         if self.data is not None:
@@ -349,7 +349,7 @@ class Modeler(ABC):
             'max_durations').count()
         min_survivors_subset = train_obs_by_lead_length.filter(
             (train_obs_by_lead_length['count'] > self.config.get(
-                "min_survivors_in_train", 64)).alias('max_durations'))
+                "MIN_SURVIVOR_IN_TRAIN", 64)).alias('max_durations'))
         assert min_survivors_subset.first() is not None, "No lead length has more than 64 survivors."
         n_intervals = min_survivors_subset.agg(
             {'max_durations': 'max'}
@@ -491,7 +491,7 @@ class SurvivalModeler(Modeler):
             subset=self.data.select(self.predict_col), cumulative=(not self.allow_gaps))
         forecasts = forecasts.to_koalas()
         #index = list(self.data.filter(self.data[self.predict_col]).select(
-        #    self.config["individual_identifier"]).toPandas())
+        #    self.config["INDIVIDUAL_IDENTIFIER"]).toPandas())
         #print(len(index))
         forecasts.columns = columns
         #print(forecasts.size)
@@ -528,20 +528,20 @@ class SurvivalModeler(Modeler):
         spark_df = spark_df.withColumn(self.duration_col, when(
             spark_df[self.duration_col] <= spark_df[self.max_lead_col], spark_df[self.duration_col]).otherwise(spark_df[self.max_lead_col]))
         if self.allow_gaps:
-            ids = spark_df[self.config["individual_identifier"],
+            ids = spark_df[self.config["INDIVIDUAL_IDENTIFIER"],
                            self.config["time_identifer"]]
             ids = ids.withColumn(
-                self.config["individual_identifier"] + '_new', ids[self.config["individual_identifier"]])
+                self.config["INDIVIDUAL_IDENTIFIER"] + '_new', ids[self.config["INDIVIDUAL_IDENTIFIER"]])
             ids = ids.withColumn(
-                self.config["time_identifier"] + '_new', ids[self.config["time_identifer"]] - time_horizon - 1)
+                self.config["TIME_IDENTIFIER"] + '_new', ids[self.config["time_identifer"]] - time_horizon - 1)
             ids = ids.withColumn('_label', lit(True))
             ids = ids.drop(
-                self.config["individual_identifier"], self.config["time_identifier"])
+                self.config["INDIVIDUAL_IDENTIFIER"], self.config["TIME_IDENTIFIER"])
 
-            spark_df = spark_df.join(ids, (spark_df[self.config["individual_identifier"]] == ids[self.config["individual_identifier"]]) & (
-                spark_df[self.config["time_identifier"]] == ids[self.config["time_identifier"]]), "left")
+            spark_df = spark_df.join(ids, (spark_df[self.config["INDIVIDUAL_IDENTIFIER"]] == ids[self.config["INDIVIDUAL_IDENTIFIER"]]) & (
+                spark_df[self.config["TIME_IDENTIFIER"]] == ids[self.config["TIME_IDENTIFIER"]]), "left")
             spark_df = spark_df.drop(
-                self.config["individual_identifier"] + '_new', self.config["time_identifier"] + '_new')
+                self.config["INDIVIDUAL_IDENTIFIER"] + '_new', self.config["TIME_IDENTIFIER"] + '_new')
             spark_df = spark_df.fillna(False, subset=['_label'])
         else:
             spark_df = spark_df.withColumn(
