@@ -44,7 +44,7 @@ class DataProcessor:
         """
         if colname == self.config['TIME_IDENTIFIER']:
             ks_df = ks.DataFrame(self.data)
-            ks_df['_period ']= ks_df[self.config['TIME_IDENTIFIER']].factorize(sort=True)[0]
+            ks_df['_period']= ks_df[self.config['TIME_IDENTIFIER']].factorize(sort=True)[0]
             self.data = ks_df.to_spark()
             colname = '_period'
         assert colname in self.data.columns, f"{colname} not in data"
