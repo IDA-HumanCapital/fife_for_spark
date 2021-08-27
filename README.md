@@ -64,6 +64,6 @@ modeler.build_model()
 forecasts = modeler.forecast()
 ```
 
-Here's a notebook with real data, where we forecast when world leaders will lose power.
+Here's a notebook with real data, where we forecast when world leaders will lose power: [REIGN Example Notebook](https://nbviewer.jupyter.org/github/IDA-HumanCapital/fife_for_spark/blob/main/examples/example_reign_notebook.ipynb)
 
-If you would like more information on FIFEforSpark, you can read the documentation here.
+If you would like more information on FIFEforSpark, you can read the documentation here: [fifeforspark Documentation](https://fife-for-spark.readthedocs.io/en/latest/)
