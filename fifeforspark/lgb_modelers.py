@@ -122,8 +122,14 @@ class LGBModeler(Modeler):
                     "numIterations": self.config.get("MAX_EPOCHS", 256),
                 }
             }
+        elif params.get(time_horizon, None) is None:
+            params[time_horizon] = {
+                    "objective": self.objective,
+                    "numIterations": self.config.get("MAX_EPOCHS", 256),
+                }
         if subset is None:
             subset = ~self.data[self.test_col] & ~self.data[self.predict_col]
+
         else:
             self.data = self.data.to_koalas()
             self.data['subset'] = subset.to_koalas()[list(subset.columns)[0]]
