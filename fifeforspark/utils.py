@@ -8,7 +8,6 @@ from pyspark.sql.types import StructType, StructField, StringType, IntegerType, 
 import random as rn
 import argparse
 
-
 def create_example_data1(n_persons: int = 3, n_periods: int = 12, seed_value: int = 9999
 ) -> pyspark.sql.DataFrame:
     """
