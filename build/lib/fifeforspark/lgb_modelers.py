@@ -147,7 +147,7 @@ class LGBModeler(Modeler):
         indexers = [StringIndexer(inputCol=column, outputCol=column + "_index").setHandleInvalid("keep")
                     for column in self.categorical_features]
         feature_columns = [column + "_index" for column in self.categorical_features] + self.numeric_features
-        assembler = VectorAssembler(inputCols=feature_columns, outputCol='features')
+        assembler = VectorAssembler(inputCols=feature_columns, outputCol='features').setHandleInvalid("keep")
         lgb_model = lgb(featuresCol="features",
                         labelCol="_label",
                         **params[time_horizon],
