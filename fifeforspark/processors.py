@@ -64,6 +64,11 @@ class DataProcessor:
         Returns:
             Boolean value for whether the column is degenerate
         """
+        if col == self.config['TIME_IDENTIFIER']:
+            ks_df = ks.DataFrame(self.data)
+            ks_df['_period']= ks_df[self.config['TIME_IDENTIFIER']].factorize(sort=True)[0]
+            self.data = ks_df.to_spark()
+            col = '_period'
         if self.data.select(
                 isnan(col).cast('integer').alias(col)
         ).agg({col: 'mean'}).first()[0] >= self.config.get('MAX_NULL_SHARE', 0.999):
