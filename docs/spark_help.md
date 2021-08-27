@@ -28,9 +28,11 @@ While there exists a PyPi page for MMLSpark and it is possible to pip install MM
 
 To download the newest version of MMLSpark, we recommend that you utilize the newest Maven coordinates available on the [MMLSpark GitHub repository](https://github.com/microsoft/SynapseML). The README page on their GitHub contains both the current version number, and Maven coordinates (labeled as 'master version'). This is shown below:   
 
+.. image:: images/MMLSpark_Maven.PNG
+    :width: 600px
+    :align: center
 
-![Image](images/MMLSpark_Maven.PNG)   
-
+*Current Version of MMLSpark*
 
  In Databricks, initialize a new library within the Workspace and in the desired location. A guide for performing this can be observed from the following [link](https://docs.microsoft.com/en-us/azure/cognitive-services/big-data/getting-started#azure-databricks)<sup>6</sup>, but we also outline the process in the below steps:
 
