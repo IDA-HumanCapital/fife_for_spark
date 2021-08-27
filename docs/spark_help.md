@@ -30,9 +30,8 @@ To download the newest version of MMLSpark, we recommend that you utilize the ne
 
 .. image:: images/MMLSpark_Maven.PNG
     :width: 600px
-    :align: center
-
-*Current Version of MMLSpark*
+    :align: center  
+<center> *Current Version of MMLSpark* </center>  
 
  In Databricks, initialize a new library within the Workspace and in the desired location. A guide for performing this can be observed from the following [link](https://docs.microsoft.com/en-us/azure/cognitive-services/big-data/getting-started#azure-databricks)<sup>6</sup>, but we also outline the process in the below steps:
 
