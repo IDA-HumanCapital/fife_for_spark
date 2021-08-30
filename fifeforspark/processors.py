@@ -223,7 +223,7 @@ class PanelDataProcessor(DataProcessor):
 
         max_val = lit(self.data.agg({'_period': 'max'}).first()[0])
         self.data = self.data.withColumn(
-            '_pedict_obs', self.data['_period'] == max_val)
+            '_predict_obs', self.data['_period'] == max_val)
 
         max_test_intervals = int(
             (self.data.select('_period').distinct().count() - 1) / 2)
