@@ -170,7 +170,7 @@ class PanelDataProcessor(DataProcessor):
         """
         if colname == self.config['INDIVIDUAL_IDENTIFIER']:
             return self.data
-        if self.is_degenerate(col=colname):
+        if self.is_degenerate(colname=colname):
             self.data = self.data.drop(colname)
         elif self.is_categorical(colname):
             self.data = self.data.withColumn(
