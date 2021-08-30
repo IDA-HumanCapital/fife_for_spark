@@ -54,7 +54,7 @@ class DataProcessor:
         assert self.data.select(
             colname).distinct().count() >= 2, f"{colname} does not have multiple unique values"
 
-    def is_degenerate(self, col: str) -> bool:
+    def is_degenerate(self, colname: str) -> bool:
         """
         Determine if a feature is constant or has too many missing values
 
@@ -64,16 +64,16 @@ class DataProcessor:
         Returns:
             Boolean value for whether the column is degenerate
         """
-        if col == self.config['TIME_IDENTIFIER']:
+        if colname == self.config['TIME_IDENTIFIER']:
             ks_df = ks.DataFrame(self.data)
             ks_df['_period']= ks_df[self.config['TIME_IDENTIFIER']].factorize(sort=True)[0]
             self.data = ks_df.to_spark()
-            col = '_period'
+            colname = '_period'
         if self.data.select(
-                isnan(col).cast('integer').alias(col)
-        ).agg({col: 'mean'}).first()[0] >= self.config.get('MAX_NULL_SHARE', 0.999):
+                isnan(colname).cast('integer').alias(colname)
+        ).agg({colname: 'mean'}).first()[0] >= self.config.get('MAX_NULL_SHARE', 0.999):
             return True
-        if self.data.select(col).distinct().count() < 2:
+        if self.data.select(colname).distinct().count() < 2:
             return True
         return False
 
@@ -170,7 +170,7 @@ class PanelDataProcessor(DataProcessor):
         """
         if colname == self.config['INDIVIDUAL_IDENTIFIER']:
             return self.data
-        if self.is_degenerate(col=colname):
+        if self.is_degenerate(colname=colname):
             self.data = self.data.drop(colname)
         elif self.is_categorical(colname):
             self.data = self.data.withColumn(
@@ -227,7 +227,7 @@ class PanelDataProcessor(DataProcessor):
 
         max_test_intervals = int(
             (self.data.select('_period').distinct().count() - 1) / 2)
-        if self.config.get('TEST_INTERVALS', -1) > max_test_intervals:
+        if self.config.get('TEST_INTERVALS', 0) > max_test_intervals:
             warn(
                 f"The specified value for TEST_INTERVALS was too high and will not allow for enough training periods. It was automatically reduced to {max_test_intervals}"
             )
@@ -242,19 +242,17 @@ class PanelDataProcessor(DataProcessor):
 
         obs_max_window = Window.partitionBy(
             '_test').orderBy(col("_period").desc())
-        self.data = self.data.withColumn('obs_max_period', F.max(
-            self.data['_period']).over(obs_max_window))
-        self.data = self.data.withColumn(
-            '_maximum_lead', self.data.obs_max_period - self.data['_period'] + (
-                self.data.obs_max_period < max_val).cast('int'))
+        self.data = self.data.withColumn('_maximum_lead', F.max(
+            self.data['_period']).over(obs_max_window) - self.data['_period'] + (
+                F.max(self.data['_period']).over(obs_max_window) < max_val).cast('int'))
 
         period_window = Window.partitionBy(
             self.config['INDIVIDUAL_IDENTIFIER']).orderBy('_period')
-        self.data = self.data.withColumn("prev_period", lag(
-            self.data['_period']).over(period_window))
         self.data = self.data.withColumn(
-            "gaps", self.data.prev_period < (self.data['_period'] - 1)).fillna(False)
-        self.data = self.data.withColumn("gaps", self.data.gaps.cast('int'))
+            "gaps", lag(self.data['_period']).over(period_window) < (
+                self.data['_period'] - 1)).fillna(False).withColumn(
+                    "gaps", col('gaps').cast('int'))
+
         self.data = self.data.withColumn(
             "_spell", F.sum(self.data.gaps).over(period_window))
 
@@ -265,18 +263,13 @@ class PanelDataProcessor(DataProcessor):
 
         max_duration_window = Window.partitionBy(
             [self.config['INDIVIDUAL_IDENTIFIER'], '_spell']).orderBy(col("_period").desc())
-        self.data = self.data.withColumn('max_duration', F.max(
-            self.data['_duration']).over(max_duration_window))
-        self.data = self.data.withColumn(
-            '_duration', self.data.max_duration - self.data['_duration'])
+        self.data = self.data.withColumn('_duration', F.max(
+            self.data['_duration']).over(max_duration_window) - self.data['_duration'])
         self.data = self.data.withColumn(
             '_event_observed', self.data['_duration'] < self.data['_maximum_lead'])
 
-        self.data = self.data.drop('max_duration')
-        self.data = self.data.drop('prev_period')
         self.data = self.data.drop('gaps')
         self.data = self.data.drop('val_flagged')
-        self.data = self.data.drop('Obs_max_period')
         return self.data
 
     def sort_panel_data(self) -> pyspark.sql.DataFrame:
