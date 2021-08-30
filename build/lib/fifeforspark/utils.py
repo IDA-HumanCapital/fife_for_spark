@@ -158,7 +158,7 @@ class FIFEArgParser(argparse.ArgumentParser):
         self.add_argument(
             "--SEED",
             type=int,
-            default=seed_value,
+            default=9999,
             help="The initializing value for all random number generators.",
         )
         self.add_argument(

@@ -10,7 +10,6 @@ from pyspark.sql.functions import udf, date_format, col
 from pyspark.sql.types import FloatType
 from fifeforspark.base_modelers import default_subset_to_all, Modeler, SurvivalModeler
 import databricks.koalas as ks
-ks.set_option('compute.ops_on_diff_frames', True)
 
 class LGBModeler(Modeler):
     """Train a gradient-boosted tree model for each lead length using MMLSpark's LightGBM.
