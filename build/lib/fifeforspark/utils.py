@@ -2,65 +2,44 @@ from pyspark.sql import SparkSession
 import pandas as pd
 import findspark
 import pyspark
-from pyspark.mllib.random import RandomRDDs
 import numpy as np
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, FloatType
 import random as rn
 import argparse
 
-def create_example_data1(n_persons: int = 3, n_periods: int = 12, seed_value: int = 9999
+def create_example_data1(n_persons: int = 1000, n_periods: int = 20
 ) -> pyspark.sql.DataFrame:
-    """
-    Create example data for testing FIFE
-
-    Args:
-        n_persons: the number of people to be in the dataset
-        n_periods: the number of periods to be in the dataset
-        seed_value: seed for random value generation
-
-    Returns:
-        Spark dataframe with example data
-    """
     findspark.init()
     spark = SparkSession.builder.getOrCreate()
     schema = StructType([
-        StructField('individual', StringType(), True),
-        StructField('period', StringType(), True),
-        StructField('feature_1', StringType(), True),
+        StructField('individual', IntegerType(), True),
+        StructField('period', IntegerType(), True),
+        StructField('feature_1', FloatType(), True),
         StructField('feature_2', StringType(), True),
-        StructField('feature_3', StringType(), True),
+        StructField('feature_3', IntegerType(), True),
         StructField('feature_4', StringType(), True)])
     values = spark.createDataFrame([], schema)
     for i in np.arange(n_persons):
-            period = np.random.randint(n_periods)+1 #Sparkify this
-            rdd1 = RandomRDDs.uniformRDD(spark,size = 1, seed = seed_value)
-            x_1 = rdd1.first()
-
-            obj1 = spark.sparkContext.parallelize(["A","B","C"])
-            x_2 = obj1.takeSample(False, 1, seed = seed_value)[0]
-
-            rdd3 = RandomRDDs.uniformRDD(spark, size = 1, seed = seed_value).map(lambda v: 1 + v)
-            x_3 = rdd3.first()
-
-            obj2 = spark.sparkContext.parallelize(["a","b","c", 1, 2, 3, np.nan])
-            x_4 = obj2.takeSample(False, 1, seed = seed_value)[0]
+            period = np.random.randint(n_periods) + 1
+            x_1 = np.random.uniform()
+            x_2 = rn.choice(["A", "B", "C"])
+            x_3 = np.random.uniform() + 1.0
+            x_4_categories = [1, 2, 3, 'a', 'b', 'c', np.nan]
+            x_4 = rn.choice(x_4_categories)
             while period <= n_periods:
-                    print(period)
-                    values = values.union(spark.createDataFrame([(int(i), period, x_1, x_2, x_3, x_4)]))
-                    if x_2 == 'A':
-                        unif_point1 = RandomRDDs.uniformRDD(spark, size = 1, seed = seed_value).map(lambda v: (.1) * v)
-                        x_1 += unif_point1.first()
-                    else:
-                        unif_point2 = RandomRDDs.uniformRDD(spark, size = 1, seed = seed_value).map(lambda v: (.2) * v)
-                        x_1 += unif_point2.first()
-                    if x_1 > np.sqrt(x_3):
-                        break
-                    if x_4 in obj2.take(5):
-                        x_4_transition_value = obj2.collect()[obj2.collect().index(x_4) + 1] #Remove all these collects
-                        if RandomRDDs.uniformRDD(spark, size = 1, seed = seed_value).first() >= 0.75:
-                            x_4 = x_4_transition_value 
-                            del x_4_transition_value
-                    period += 1
+                values = values.union(spark.createDataFrame([(int(i), period, x_1, x_2, x_3, x_4)]))
+                if x_2 == "A":
+                    x_1 += np.random.uniform(0, 0.1)
+                else:
+                    x_1 += np.random.uniform(0, 0.2)
+                if x_1 > np.sqrt(x_3):
+                    break
+                if x_4 in x_4_categories[:-2]:
+                    x_4_transition_value = x_4_categories[x_4_categories.index(x_4) + 1]
+                    if np.random.uniform() >= 0.75:
+                        x_4 = x_4_transition_value
+                        del x_4_transition_value
+                period += 1
     values = values.withColumn('feature_5', values.feature_2)
     return values
 
