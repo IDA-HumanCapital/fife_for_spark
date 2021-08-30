@@ -242,9 +242,11 @@ class PanelDataProcessor(DataProcessor):
 
         obs_max_window = Window.partitionBy(
             '_test').orderBy(col("_period").desc())
-        self.data = self.data.withColumn('_maximum_lead', F.max(
-            self.data['_period']).over(obs_max_window) - self.data['_period'] + (
-                F.max(self.data['_period']).over(obs_max_window) < max_val).cast('int'))
+        self.data = self.data.withColumn('obs_max_period', F.max(
+            self.data['_period']).over(obs_max_window))
+        self.data = self.data.withColumn(
+            '_maximum_lead', self.data.obs_max_period - self.data['_period'] + (
+                self.data.obs_max_period < max_val).cast('int'))
 
         period_window = Window.partitionBy(
             self.config['INDIVIDUAL_IDENTIFIER']).orderBy('_period')
@@ -270,6 +272,7 @@ class PanelDataProcessor(DataProcessor):
 
         self.data = self.data.drop('gaps')
         self.data = self.data.drop('val_flagged')
+        self.data = self.data.drop('obs_max_period')
         return self.data
 
     def sort_panel_data(self) -> pyspark.sql.DataFrame:

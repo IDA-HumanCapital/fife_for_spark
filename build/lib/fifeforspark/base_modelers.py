@@ -73,7 +73,7 @@ def compute_metrics_for_binary_outcomes(
     else:
         metrics["AUROC"] = np.nan
 
-    # Difficult to do a weighted avg in pyspark, leaving out for now
+    # TODO: Add weighted average functionality
     mean_predict = predictions.agg({'predictions': 'mean'}).first()[0]
     mean_actual = actuals.agg({'actuals': 'mean'}).first()[0]
     metrics["Predicted Share"] = mean_predict
@@ -474,7 +474,7 @@ class SurvivalModeler(Modeler):
         metrics = pd.DataFrame(metrics, index=lead_lengths)
         metrics.index.name = "Lead Length"
         metrics["Other Metrics:"] = ""
-        # Removed concordance index functionality for now
+        # TODO: Add concordance index functionality
         metrics = metrics.dropna()
         return metrics
 
@@ -490,12 +490,8 @@ class SurvivalModeler(Modeler):
         forecasts = self.predict(
             subset=self.data.select(self.predict_col), cumulative=(not self.allow_gaps))
         forecasts = forecasts.to_koalas()
-        #index = list(self.data.filter(self.data[self.predict_col]).select(
-        #    self.config["INDIVIDUAL_IDENTIFIER"]).toPandas())
-        #print(len(index))
         forecasts.columns = columns
-        #print(forecasts.size)
-        #forecasts['index'] = index
+        # TODO: Add custom index values
         return forecasts
 
     def subset_for_training_horizon(self, data: pyspark.sql.DataFrame, time_horizon: int) -> pyspark.sql.DataFrame:
@@ -523,7 +519,6 @@ class SurvivalModeler(Modeler):
         Returns:
             Data with outcome label added based on time_horizon
         """
-        # Spark automatically creates a copy when setting one value equal to another, different from python
         spark_df = self.data
         spark_df = spark_df.withColumn(self.duration_col, when(
             spark_df[self.duration_col] <= spark_df[self.max_lead_col], spark_df[self.duration_col]).otherwise(spark_df[self.max_lead_col]))
