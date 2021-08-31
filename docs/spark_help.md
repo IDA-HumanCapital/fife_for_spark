@@ -1,5 +1,5 @@
 
-This document discusses all things Spark. The purpose of this document is to answer any and all questions [FIFE](https://github.com/IDA-HumanCapital/fife) users may have when transitioning to fifeforspark.
+This document discusses all things Spark. The purpose of this document is to answer any and all questions [FIFE](https://github.com/IDA-HumanCapital/fife) users may have when transitioning to FIFEforSpark.
 
 
 ## What is Apache Spark?
@@ -14,17 +14,16 @@ The primary benefits of applying Apache Spark (and Cluster computation in genera
 * The process is computationally expensive and takes far longer to run on a single computer than what is reasonable
 * The dataset is too large and requires more memory than a singular computer is capable of storing or computing on 
 
-Both these reasons are directly relevant to the context of FIFE. By developing fifeforspark, we hope to extend the power of FIFE's forecasting and retention prediction capabilities towards larger datasets and in turn, bypass any previous memory error restrictions. In cases where users have only been able to run FIFE on a subset of their data, fifeforspark allows these users to apply the full extent of their dataset towards training and prediction. This allows users to account for more features and data records, with the end goal of improving overall model quality.
+Both these reasons are directly relevant to the context of FIFE. By developing FIFEforSpark, we hope to extend the power of FIFE's forecasting and retention prediction capabilities towards larger datasets and in turn, bypass any previous memory error restrictions. In cases where users have only been able to run FIFE on a subset of their data, FIFEforSpark allows these users to apply the full extent of their dataset towards training and prediction. This allows users to account for more features and data records, with the end goal of improving overall model quality.
 
 ## How to download MMLSpark
 **MMLSpark** is a spark-compatible machine learning package developed by Microsoft<sup>4</sup>.
-MMLSpark provides a distributed version of LightGBM, the gradient boosting package which FIFE utilizes. Therefore, MMLSpark is a required package for fifeforspark to operate. We focus our discussion on how to download MMLSpark on Databricks.
+MMLSpark provides a distributed version of LightGBM, the gradient boosting package which FIFE utilizes. Therefore, MMLSpark is a required package for FIFEforSpark to operate. We focus our discussion on how to download MMLSpark on Databricks.
 
-While there exists a PyPi page for MMLSpark and it is possible to pip install MMLSpark, we recommend that you do not download MMLSpark in this way. This is because the version of MMLSpark available on PyPi has not been updated, and is not compatible with the current versions of Python, Spark, and Scala. Attempting to utilize fifeforspark with the PyPi verson of MMLSpark will display an error similar to the following<sup>5</sup> :
+While there exists a PyPi page for MMLSpark and it is possible to pip install MMLSpark, we recommend that you do not download MMLSpark in this way. This is because the version of MMLSpark available on PyPi has not been updated, and is not compatible with the current versions of Python, Spark, and Scala. Attempting to utilize FIFEforSpark with the PyPi verson of MMLSpark will display an error similar to the following<sup>5</sup> :
 
 <center> ModuleNotFoundError: No module named 'mmlspark.lightgbm._LightGBMClassifier' </center>  
 
-<br>
 
 To download the newest version of MMLSpark, we recommend that you utilize the most recent Maven coordinates available on the [MMLSpark GitHub repository](https://github.com/microsoft/SynapseML). The README page on their GitHub contains both the current version number, and Maven coordinates (labeled as 'master version'). This is shown below:   
 
