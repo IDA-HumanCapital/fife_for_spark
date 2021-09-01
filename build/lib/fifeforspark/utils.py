@@ -60,6 +60,7 @@ def create_example_data2(
     """
     findspark.init()
     spark = SparkSession.builder.getOrCreate()
+    spark.conf.set("spark.sql.execution.arrow.enabled", "false")
     seed = seed_value
     np.random.seed(seed)
     values = []
@@ -105,6 +106,7 @@ def create_example_data2(
         StructField('feature_3', FloatType(), True),
         StructField('feature_4', StringType(), True),
         StructField('feature_5', StringType(), True)])
+    spark.conf.set("spark.sql.execution.arrow.enabled", "true")
     return spark.createDataFrame(values, schema = schema)
 
 def import_data_file(path: str = "Input Data") -> pyspark.sql.DataFrame:

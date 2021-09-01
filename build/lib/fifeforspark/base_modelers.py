@@ -9,10 +9,10 @@ import findspark
 import pyspark.sql
 from pyspark.sql import SparkSession
 from pyspark.sql.types import DoubleType
-from pyspark.sql.functions import lit, when, monotonically_increasing_id
-from pyspark.mllib.evaluation import BinaryClassificationMetrics
+from pyspark.sql.functions import lit, when, monotonically_increasing_id, mean, col
+from pyspark.ml.evaluation import BinaryClassificationEvaluator
 from lifelines.utils import concordance_index
-
+from time import time
 findspark.init()
 
 spark = SparkSession.builder.getOrCreate()
@@ -39,7 +39,7 @@ def default_subset_to_all(
 
 
 def compute_metrics_for_binary_outcomes(
-    actuals: pyspark.sql.DataFrame, predictions: pyspark.sql.DataFrame,
+    actuals: pyspark.sql.DataFrame, predictions: pyspark.sql.DataFrame, total: int,
     threshold_positive: Union[None, str, float] = 0.5, share_positive: Union[None, str, float] = None
 ) -> OrderedDict:
     """
@@ -54,30 +54,37 @@ def compute_metrics_for_binary_outcomes(
     Returns:
         Ordered dictionary with evaluation metrics
     """
+    s1 = time()
+    predictions.cache()
+    actuals.cache()
     actuals = actuals.select(actuals['actuals'].cast(DoubleType()))
     num_true = actuals.agg({'actuals': 'sum'}).first()[0]
-    total = actuals.count()
     metrics = OrderedDict()
+    e1 = time()
     if num_true is None:
         num_true = 0
     if (num_true > 0) & (num_true < total):
+        s2 = time()
         predictions = predictions.withColumn(
             "row_id", monotonically_increasing_id())
         actuals = actuals.withColumn("row_id", monotonically_increasing_id())
         preds_and_labs = predictions.join(actuals, predictions.row_id == actuals.row_id).select(
             predictions.predictions, actuals.actuals)
-        scoresAndLabels = preds_and_labs.rdd.map(tuple)
-        evaluator = BinaryClassificationMetrics(scoresAndLabels)
-        metrics['AUROC'] = evaluator.areaUnderROC
-
+        preds_and_labs.cache()
+        preds_and_labs = preds_and_labs.withColumn('rawPrediction', preds_and_labs.predictions.cast(DoubleType()))
+        evaluator = BinaryClassificationEvaluator(labelCol='actuals')
+        metrics['AUROC'] = evaluator.evaluate(preds_and_labs, {evaluator.metricName: "areaUnderROC"})
+        preds_and_labs = preds_and_labs.drop('rawPrediction')
+        e2 = time()
     else:
         metrics["AUROC"] = np.nan
 
     # TODO: Add weighted average functionality
-    mean_predict = predictions.agg({'predictions': 'mean'}).first()[0]
-    mean_actual = actuals.agg({'actuals': 'mean'}).first()[0]
+    s3 = time()
+    mean_predict = predictions.select(mean(col('predictions'))).first()[0]
+    metrics["Actual Share"] = actuals.select(mean(col('actuals'))).first()[0]
     metrics["Predicted Share"] = mean_predict
-    metrics["Actual Share"] = mean_actual
+    e3 = time()
     if actuals.first() is not None:
         if share_positive == 'predicted':
             share_positive = predictions.agg(
@@ -87,15 +94,21 @@ def compute_metrics_for_binary_outcomes(
                 'predictions', [1-share_positive], relativeError=.1)[0]
         elif threshold_positive == 'predicted':
             threshold_positive = mean_predict
-        
+        s4 = time()
         preds_and_labs = preds_and_labs.withColumn('predictions', when(
             preds_and_labs.predictions >= threshold_positive, 1).otherwise(0))
-        
+        e4 = time()
+        s5 = time()
         outcomes = {'True Positives': [1,1], 'False Negatives': [0,1], 'False Positives': [1,0], 'True Negatives': [0,0]}
         for key in outcomes.keys():
             metrics[key] = preds_and_labs.select(((preds_and_labs.predictions == outcomes[key][0]) & (
                 preds_and_labs.actuals == outcomes[key][1])).cast('int').alias('Outcome')).agg({'Outcome': 'sum'}).first()[0]
-
+        e5 = time()
+    print(e1 - s1)
+    print(e2 - s2)
+    print(e3 - s3)
+    print(e4 - s4)
+    print(e5 - s5)
     return metrics
 
 
@@ -462,11 +475,14 @@ class SurvivalModeler(Modeler):
             actuals = actuals.filter(actuals.subset)
             actuals = actuals.filter(actuals[self.max_lead_col] >= int(lead_length))
             actuals = actuals.select(actuals["_label"].alias('actuals'))
+            if lead_length == 1:
+                total = actuals.count()
             metrics.append(
                 compute_metrics_for_binary_outcomes(
                     actuals,
                     predictions.select(
-                        predictions[int(lead_length - 1)].alias('predictions')).limit(actuals.count()),
+                        predictions[int(lead_length - 1)].alias('predictions')).limit(actuals.count()), 
+                    total=total,
                     threshold_positive=threshold_positive,
                     share_positive=share_positive,
                 )
