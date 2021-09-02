@@ -27,11 +27,11 @@ While there exists a PyPi page for MMLSpark and it is possible to pip install MM
 
 To download the newest version of MMLSpark, we recommend that you utilize the most recent Maven coordinates available on the [MMLSpark GitHub repository](https://github.com/microsoft/SynapseML). The README page on their GitHub contains both the current version number, and Maven coordinates (labeled as 'master version'). This is shown below:   
 
-.. image:: images/MMLSpark_Maven.PNG
+.. image:: images/MMLSpark_Maven.png
     :width: 600px
-    :align: center  
+    :align: center   
 
- In Databricks, initialize a new library within the Workspace and in the desired location. A guide for performing this can be observed from the following [link](https://docs.microsoft.com/en-us/azure/cognitive-services/big-data/getting-started#azure-databricks) <sup>6</sup>, but we also outline the process in the below steps:
+In Databricks, initialize a new library within the Workspace and in the desired location. A guide for performing this can be observed from the following [link](https://docs.microsoft.com/en-us/azure/cognitive-services/big-data/getting-started#azure-databricks)<sup>6</sup>, but we also outline the process in the below steps:
 
 1. Once on Databricks, click on the Workspace button located in the left-hand panel
 2. Right-click anywhere within the Workspace
@@ -39,7 +39,7 @@ To download the newest version of MMLSpark, we recommend that you utilize the mo
 4. Once in the library creation menu, change the 'Library Source' to Maven
 
 Within Maven, you will see inputs for the 'Coordinates' and 'Repository'. The MMLSpark Maven coordinates are a combination of a prefix, the current Scala version, and the current master version mentioned above. A general format and the current Maven Coordinates format are both displayed below:
-* General Maven Coordinates: com.microsoft.ml.spark:mmlspark_***insert_current_scala_version*** : ***insert_current_master_version***
+* General Maven Coordinates: com.microsoft.ml.spark:mmlspark\_**insert_current_scala_version** : **insert_current_master_version**
 
 * Current Maven Coordinates: com.microsoft.ml.spark:mmlspark_2.12:1.0.0-rc3-167-586e6761-SNAPSHOT
 
