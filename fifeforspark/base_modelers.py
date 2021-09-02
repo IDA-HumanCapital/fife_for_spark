@@ -40,7 +40,8 @@ def default_subset_to_all(
 
 def compute_metrics_for_binary_outcomes(
     actuals: pyspark.sql.DataFrame, predictions: pyspark.sql.DataFrame, total: int,
-    threshold_positive: Union[None, str, float] = 0.5, share_positive: Union[None, str, float] = None
+    threshold_positive: Union[None, str, float] = 0.5, share_positive: Union[None, str, float] = None,
+    cache = False
 ) -> OrderedDict:
     """
     Function to compute performance metrics for binary classification models
@@ -54,37 +55,33 @@ def compute_metrics_for_binary_outcomes(
     Returns:
         Ordered dictionary with evaluation metrics
     """
-    s1 = time()
-    predictions.cache()
-    actuals.cache()
+    if cache == True:
+        predictions.cache()
+        actuals.cache()
     actuals = actuals.select(actuals['actuals'].cast(DoubleType()))
     num_true = actuals.agg({'actuals': 'sum'}).first()[0]
     metrics = OrderedDict()
-    e1 = time()
     if num_true is None:
         num_true = 0
     if (num_true > 0) & (num_true < total):
-        s2 = time()
         predictions = predictions.withColumn(
             "row_id", monotonically_increasing_id())
         actuals = actuals.withColumn("row_id", monotonically_increasing_id())
         preds_and_labs = predictions.join(actuals, predictions.row_id == actuals.row_id).select(
             predictions.predictions, actuals.actuals)
-        preds_and_labs.cache()
+        if cache == True:
+            preds_and_labs.cache()
         preds_and_labs = preds_and_labs.withColumn('rawPrediction', preds_and_labs.predictions.cast(DoubleType()))
         evaluator = BinaryClassificationEvaluator(labelCol='actuals')
         metrics['AUROC'] = evaluator.evaluate(preds_and_labs, {evaluator.metricName: "areaUnderROC"})
         preds_and_labs = preds_and_labs.drop('rawPrediction')
-        e2 = time()
     else:
         metrics["AUROC"] = np.nan
 
     # TODO: Add weighted average functionality
-    s3 = time()
     mean_predict = predictions.select(mean(col('predictions'))).first()[0]
     metrics["Actual Share"] = actuals.select(mean(col('actuals'))).first()[0]
     metrics["Predicted Share"] = mean_predict
-    e3 = time()
     if actuals.first() is not None:
         if share_positive == 'predicted':
             share_positive = predictions.agg(
@@ -94,21 +91,12 @@ def compute_metrics_for_binary_outcomes(
                 'predictions', [1-share_positive], relativeError=.1)[0]
         elif threshold_positive == 'predicted':
             threshold_positive = mean_predict
-        s4 = time()
         preds_and_labs = preds_and_labs.withColumn('predictions', when(
             preds_and_labs.predictions >= threshold_positive, 1).otherwise(0))
-        e4 = time()
-        s5 = time()
         outcomes = {'True Positives': [1,1], 'False Negatives': [0,1], 'False Positives': [1,0], 'True Negatives': [0,0]}
         for key in outcomes.keys():
             metrics[key] = preds_and_labs.select(((preds_and_labs.predictions == outcomes[key][0]) & (
                 preds_and_labs.actuals == outcomes[key][1])).cast('int').alias('Outcome')).agg({'Outcome': 'sum'}).first()[0]
-        e5 = time()
-    print(e1 - s1)
-    print(e2 - s2)
-    print(e3 - s3)
-    print(e4 - s4)
-    print(e5 - s5)
     return metrics
 
 
@@ -485,6 +473,7 @@ class SurvivalModeler(Modeler):
                     total=total,
                     threshold_positive=threshold_positive,
                     share_positive=share_positive,
+                    cache = self.config.get('CACHE', True)
                 )
             )
         metrics = pd.DataFrame(metrics, index=lead_lengths)

@@ -60,7 +60,6 @@ def create_example_data2(
     """
     findspark.init()
     spark = SparkSession.builder.getOrCreate()
-    spark.conf.set("spark.sql.execution.arrow.enabled", "false")
     seed = seed_value
     np.random.seed(seed)
     values = []
@@ -106,7 +105,6 @@ def create_example_data2(
         StructField('feature_3', FloatType(), True),
         StructField('feature_4', StringType(), True),
         StructField('feature_5', StringType(), True)])
-    spark.conf.set("spark.sql.execution.arrow.enabled", "true")
     return spark.createDataFrame(values, schema = schema)
 
 def import_data_file(path: str = "Input Data") -> pyspark.sql.DataFrame:
@@ -193,4 +191,9 @@ class FIFEArgParser(argparse.ArgumentParser):
             "--MIN_SURVIVOR_IN_TRAIN",
             type=int,
             help="The minimum number of training set observations surviving a given time horizon for the model to be trained to make predictions for that time horizon.",
+        )
+        self.add_argument(
+            "--CACHE",
+            type=bool,
+            help="A boolean value indicating whether or not to cache designated objects. Caching improves algorithm runtime, but is not applicable on larger datasets due to memory errors.",
         )
