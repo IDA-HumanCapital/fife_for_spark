@@ -11,12 +11,6 @@ from pyspark.sql import SparkSession
 from pyspark.sql.types import DoubleType
 from pyspark.sql.functions import lit, when, monotonically_increasing_id, mean, col
 from pyspark.ml.evaluation import BinaryClassificationEvaluator
-from lifelines.utils import concordance_index
-from time import time
-findspark.init()
-
-spark = SparkSession.builder.getOrCreate()
-
 
 def default_subset_to_all(    
     subset: Union[None, pyspark.sql.DataFrame], data: pyspark.sql.DataFrame
@@ -177,6 +171,9 @@ class Modeler(ABC):
                 between the period of observations and the last period of the
                 given time horizon.
         """
+        findspark.init()
+        self.spark = SparkSession.builder.getOrCreate()
+        
         ks.set_option('compute.ops_on_diff_frames', True)
         
         if (config.get("TIME_IDENTIFIER", "") == "") and data is not None:
@@ -185,8 +182,6 @@ class Modeler(ABC):
         if (config.get("INDIVIDUAL_IDENTIFIER", "") == "") and data is not None:
             config["INDIVIDUAL_IDENTIFIER"] = data.columns[0]
 
-        findspark.init()
-        self.spark = SparkSession.builder.getOrCreate()
         self.config = config
         self.data = data
         self.duration_col = duration_col
