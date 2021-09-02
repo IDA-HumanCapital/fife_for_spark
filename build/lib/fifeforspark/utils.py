@@ -2,12 +2,13 @@ from pyspark.sql import SparkSession
 import pandas as pd
 import findspark
 import pyspark
+import databricks.koalas as ks
 import numpy as np
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, FloatType
 import random as rn
 import argparse
 
-def create_example_data1(n_persons: int = 1000, n_periods: int = 20
+def create_example_data(n_persons: int = 8192, n_periods: int = 20
 ) -> pyspark.sql.DataFrame:
     findspark.init()
     spark = SparkSession.builder.getOrCreate()
@@ -19,6 +20,7 @@ def create_example_data1(n_persons: int = 1000, n_periods: int = 20
         StructField('feature_3', IntegerType(), True),
         StructField('feature_4', StringType(), True)])
     values = spark.createDataFrame([], schema)
+    values_ks = values.to_koalas()
     for i in np.arange(n_persons):
             period = np.random.randint(n_periods) + 1
             x_1 = np.random.uniform()
@@ -27,7 +29,7 @@ def create_example_data1(n_persons: int = 1000, n_periods: int = 20
             x_4_categories = [1, 2, 3, 'a', 'b', 'c', np.nan]
             x_4 = rn.choice(x_4_categories)
             while period <= n_periods:
-                values = values.union(spark.createDataFrame([(int(i), period, x_1, x_2, x_3, x_4)]))
+                values_ks = values_ks.append(ks.DataFrame([[(int(i), period, x_1, x_2, x_3, x_4)]], columns = values.columns))
                 if x_2 == "A":
                     x_1 += np.random.uniform(0, 0.1)
                 else:
@@ -40,6 +42,7 @@ def create_example_data1(n_persons: int = 1000, n_periods: int = 20
                         x_4 = x_4_transition_value
                         del x_4_transition_value
                 period += 1
+    values = values_ks.to_spark()
     values = values.withColumn('feature_5', values.feature_2)
     return values
 
