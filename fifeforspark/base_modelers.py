@@ -11,6 +11,8 @@ from pyspark.sql import SparkSession
 from pyspark.sql.types import DoubleType
 from pyspark.sql.functions import lit, when, monotonically_increasing_id, mean, col
 from pyspark.ml.evaluation import BinaryClassificationEvaluator
+from warnings import warn
+
 
 def default_subset_to_all(    
     subset: Union[None, pyspark.sql.DataFrame], data: pyspark.sql.DataFrame
@@ -215,7 +217,11 @@ class Modeler(ABC):
                                      if feature not in (self.categorical_features + self.reserved_cols)]
             self.data = self.transform_features()
         if config['gbt_type'] == "lgbm":
-            import mmlspark.lightgbm.LightGBMClassifier as gbt
+            try:
+                import mmlspark.lightgbm.LightGBMClassifier as gbt
+            except:
+                warn("Issue importing MMLSpark. Make sure it is installed on your cluster. Using GBT instead...")
+                import pyspark.ml.classification.GBTClassifier as gbt
         elif config['gbt_type'] == "gbt":
             import pyspark.ml.classification.GBTClassifier as gbt
 
