@@ -216,11 +216,6 @@ class PanelDataProcessor(DataProcessor):
             Spark DataFrame with reserved columns added
         """
 
-        ks_df = ks.DataFrame(self.data)
-        ks_df['_period'] = ks_df[self.config['TIME_IDENTIFIER']].factorize(sort=True)[
-            0]
-        self.data = ks_df.to_spark()
-
         max_val = lit(self.data.agg({'_period': 'max'}).first()[0])
         self.data = self.data.withColumn(
             '_predict_obs', self.data['_period'] == max_val)
@@ -293,7 +288,8 @@ class PanelDataProcessor(DataProcessor):
             Processed data
         """
 
-        self.data.cache()
+        if self.config.get('CACHE', True) == True:
+            self.data.cache()
         self.check_panel_consistency()
         self.data = self.process_all_columns()
         self.data = self.build_reserved_cols()

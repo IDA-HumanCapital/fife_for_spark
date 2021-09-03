@@ -192,3 +192,8 @@ class FIFEArgParser(argparse.ArgumentParser):
             type=int,
             help="The minimum number of training set observations surviving a given time horizon for the model to be trained to make predictions for that time horizon.",
         )
+        self.add_argument(
+            "--CACHE",
+            type=bool,
+            help="A boolean value indicating whether or not to cache designated objects. Caching improves algorithm runtime, but is not applicable on larger datasets due to memory errors.",
+        )

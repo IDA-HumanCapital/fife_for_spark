@@ -269,7 +269,7 @@ MIN_SURVIVORS_IN_TRAIN; default: 64; type: Integer
 TEST_INTERVALS; default: -1; type: Integer
 	The number of most recent periods to treat as absent from the data during training for the purpose of model evaluation. Larger values may decrease model performance and run time and/or increase evaluation time frame.
 TEST_PERIODS; default: 0; type: Integer
-	One plus the value represented by TEST_INTERVALS. Deprecated and overriden by TEST_INTERVALS.
+	One plus the value represented by TEST_INTERVALS. Deprecated and overridden by TEST_INTERVALS.
 VALIDATION_SHARE; default: 0.25; type: Decimal
 	The share of observations used for evaluation instead of training for hyperoptimization or early stopping. Larger values may increase or decrease model performance and/or run time.
 

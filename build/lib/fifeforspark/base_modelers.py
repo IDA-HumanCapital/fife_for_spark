@@ -9,14 +9,8 @@ import findspark
 import pyspark.sql
 from pyspark.sql import SparkSession
 from pyspark.sql.types import DoubleType
-from pyspark.sql.functions import lit, when, monotonically_increasing_id
-from pyspark.mllib.evaluation import BinaryClassificationMetrics
-from lifelines.utils import concordance_index
-
-findspark.init()
-
-spark = SparkSession.builder.getOrCreate()
-
+from pyspark.sql.functions import lit, when, monotonically_increasing_id, mean, col
+from pyspark.ml.evaluation import BinaryClassificationEvaluator
 
 def default_subset_to_all(    
     subset: Union[None, pyspark.sql.DataFrame], data: pyspark.sql.DataFrame
@@ -39,8 +33,9 @@ def default_subset_to_all(
 
 
 def compute_metrics_for_binary_outcomes(
-    actuals: pyspark.sql.DataFrame, predictions: pyspark.sql.DataFrame,
-    threshold_positive: Union[None, str, float] = 0.5, share_positive: Union[None, str, float] = None
+    actuals: pyspark.sql.DataFrame, predictions: pyspark.sql.DataFrame, total: int,
+    threshold_positive: Union[None, str, float] = 0.5, share_positive: Union[None, str, float] = None,
+    cache = False
 ) -> OrderedDict:
     """
     Function to compute performance metrics for binary classification models
@@ -54,9 +49,11 @@ def compute_metrics_for_binary_outcomes(
     Returns:
         Ordered dictionary with evaluation metrics
     """
+    if cache == True:
+        predictions.cache()
+        actuals.cache()
     actuals = actuals.select(actuals['actuals'].cast(DoubleType()))
     num_true = actuals.agg({'actuals': 'sum'}).first()[0]
-    total = actuals.count()
     metrics = OrderedDict()
     if num_true is None:
         num_true = 0
@@ -66,18 +63,19 @@ def compute_metrics_for_binary_outcomes(
         actuals = actuals.withColumn("row_id", monotonically_increasing_id())
         preds_and_labs = predictions.join(actuals, predictions.row_id == actuals.row_id).select(
             predictions.predictions, actuals.actuals)
-        scoresAndLabels = preds_and_labs.rdd.map(tuple)
-        evaluator = BinaryClassificationMetrics(scoresAndLabels)
-        metrics['AUROC'] = evaluator.areaUnderROC
-
+        if cache == True:
+            preds_and_labs.cache()
+        preds_and_labs = preds_and_labs.withColumn('rawPrediction', preds_and_labs.predictions.cast(DoubleType()))
+        evaluator = BinaryClassificationEvaluator(labelCol='actuals')
+        metrics['AUROC'] = evaluator.evaluate(preds_and_labs, {evaluator.metricName: "areaUnderROC"})
+        preds_and_labs = preds_and_labs.drop('rawPrediction')
     else:
         metrics["AUROC"] = np.nan
 
     # TODO: Add weighted average functionality
-    mean_predict = predictions.agg({'predictions': 'mean'}).first()[0]
-    mean_actual = actuals.agg({'actuals': 'mean'}).first()[0]
+    mean_predict = predictions.select(mean(col('predictions'))).first()[0]
+    metrics["Actual Share"] = actuals.select(mean(col('actuals'))).first()[0]
     metrics["Predicted Share"] = mean_predict
-    metrics["Actual Share"] = mean_actual
     if actuals.first() is not None:
         if share_positive == 'predicted':
             share_positive = predictions.agg(
@@ -87,15 +85,12 @@ def compute_metrics_for_binary_outcomes(
                 'predictions', [1-share_positive], relativeError=.1)[0]
         elif threshold_positive == 'predicted':
             threshold_positive = mean_predict
-        
         preds_and_labs = preds_and_labs.withColumn('predictions', when(
             preds_and_labs.predictions >= threshold_positive, 1).otherwise(0))
-        
         outcomes = {'True Positives': [1,1], 'False Negatives': [0,1], 'False Positives': [1,0], 'True Negatives': [0,0]}
         for key in outcomes.keys():
             metrics[key] = preds_and_labs.select(((preds_and_labs.predictions == outcomes[key][0]) & (
                 preds_and_labs.actuals == outcomes[key][1])).cast('int').alias('Outcome')).agg({'Outcome': 'sum'}).first()[0]
-
     return metrics
 
 
@@ -176,6 +171,9 @@ class Modeler(ABC):
                 between the period of observations and the last period of the
                 given time horizon.
         """
+        findspark.init()
+        self.spark = SparkSession.builder.getOrCreate()
+        
         ks.set_option('compute.ops_on_diff_frames', True)
         
         if (config.get("TIME_IDENTIFIER", "") == "") and data is not None:
@@ -184,8 +182,6 @@ class Modeler(ABC):
         if (config.get("INDIVIDUAL_IDENTIFIER", "") == "") and data is not None:
             config["INDIVIDUAL_IDENTIFIER"] = data.columns[0]
 
-        findspark.init()
-        self.spark = SparkSession.builder.getOrCreate()
         self.config = config
         self.data = data
         self.duration_col = duration_col
@@ -462,13 +458,17 @@ class SurvivalModeler(Modeler):
             actuals = actuals.filter(actuals.subset)
             actuals = actuals.filter(actuals[self.max_lead_col] >= int(lead_length))
             actuals = actuals.select(actuals["_label"].alias('actuals'))
+            if lead_length == 1:
+                total = actuals.count()
             metrics.append(
                 compute_metrics_for_binary_outcomes(
                     actuals,
                     predictions.select(
-                        predictions[int(lead_length - 1)].alias('predictions')).limit(actuals.count()),
+                        predictions[int(lead_length - 1)].alias('predictions')).limit(actuals.count()), 
+                    total=total,
                     threshold_positive=threshold_positive,
                     share_positive=share_positive,
+                    cache = self.config.get('CACHE', True)
                 )
             )
         metrics = pd.DataFrame(metrics, index=lead_lengths)
