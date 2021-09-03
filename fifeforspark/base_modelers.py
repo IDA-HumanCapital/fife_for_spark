@@ -214,6 +214,10 @@ class Modeler(ABC):
             self.numeric_features = [feature for feature in self.data.columns
                                      if feature not in (self.categorical_features + self.reserved_cols)]
             self.data = self.transform_features()
+        if config['gbt_type'] == "lgbm":
+            import mmlspark.lightgbm.LightGBMClassifier as gbt
+        elif config['gbt_type'] == "gbt":
+            import pyspark.ml.classification.GBTClassifier as gbt
 
     @abstractmethod
     def train(self) -> Any:
