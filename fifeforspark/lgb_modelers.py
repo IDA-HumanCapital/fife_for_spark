@@ -1,8 +1,7 @@
-"""FIFE modelers based on LightGBM, which trains gradient-boosted trees."""
+"""FIFEforSpark modelers based on LightGBM, which trains gradient-boosted trees."""
 
 from typing import List, Union
 
-import mmlspark.lightgbm.LightGBMClassifier as lgb
 import pyspark.sql
 from pyspark.ml import Pipeline
 from pyspark.ml.feature import VectorAssembler, StringIndexer
@@ -10,6 +9,8 @@ from pyspark.sql.functions import udf, date_format, col
 from pyspark.sql.types import FloatType
 from fifeforspark.base_modelers import default_subset_to_all, Modeler, SurvivalModeler
 import databricks.koalas as ks
+import mmlspark.lightgbm.LightGBMClassifier as lgb
+
 
 class LGBModeler(Modeler):
     """Train a gradient-boosted tree model for each lead length using MMLSpark's LightGBM.
@@ -62,6 +63,7 @@ class LGBModeler(Modeler):
         Returns:
             None
         """
+
         if n_intervals:
             self.n_intervals = n_intervals
         else:
