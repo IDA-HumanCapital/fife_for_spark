@@ -28,18 +28,7 @@ class GBTModeler(LGBModeler):
         Returns:
             Single ML Pipeline model
         """
-        if params is None:
-            params = {
-                time_horizon: {
-                    "objective": self.objective,
-                    "numIterations": self.config.get("MAX_EPOCHS", 256),
-                }
-            }
-        elif params.get(time_horizon, None) is None:
-            params[time_horizon] = {
-                    "objective": self.objective,
-                    "numIterations": self.config.get("MAX_EPOCHS", 256),
-                }
+
         if subset is None:
             subset = ~self.data[self.test_col] & ~self.data[self.predict_col]
 
@@ -61,13 +50,22 @@ class GBTModeler(LGBModeler):
                     for column in self.categorical_features]
         feature_columns = [column + "_index" for column in self.categorical_features] + self.numeric_features
         assembler = VectorAssembler(inputCols=feature_columns, outputCol='features').setHandleInvalid("keep")
-        lgb_model = gbt(featuresCol="features",
-                        labelCol="_label",
-                        **params[time_horizon],
-                        weightCol=data.filter(~data[self.validation_col])[self.weight_col]
-                        if self.weight_col
-                        else None
-                        )
+        if params is None:
+            lgb_model = gbt(featuresCol="features",
+                            labelCol="_label",
+                            weightCol=data.filter(~data[self.validation_col])[self.weight_col]
+                            if self.weight_col
+                            else None
+                            )
+        else:
+            lgb_model = gbt(featuresCol="features",
+                            labelCol="_label",
+                            **params,
+                            weightCol=data.filter(~data[self.validation_col])[self.weight_col]
+                            if self.weight_col
+                            else None
+                            )
+
         pipeline = Pipeline(stages=[*indexers, assembler, lgb_model])
         model = pipeline.fit(train_data)
         return model
