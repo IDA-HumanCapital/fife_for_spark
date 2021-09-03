@@ -6,7 +6,7 @@ from pyspark.ml import Pipeline
 from pyspark.ml.feature import VectorAssembler, StringIndexer
 from fifeforspark.base_modelers import SurvivalModeler
 from fifeforspark.lgb_modelers import LGBModeler
-import pyspark.ml.classification.GBTClassifier as gbt
+from pyspark.ml.classification import GBTClassifier as gbt
 
 
 class GBTModeler(LGBModeler):
