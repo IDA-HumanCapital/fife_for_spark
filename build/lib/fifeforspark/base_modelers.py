@@ -11,6 +11,8 @@ from pyspark.sql import SparkSession
 from pyspark.sql.types import DoubleType
 from pyspark.sql.functions import lit, when, monotonically_increasing_id, mean, col
 from pyspark.ml.evaluation import BinaryClassificationEvaluator
+from warnings import warn
+
 
 def default_subset_to_all(    
     subset: Union[None, pyspark.sql.DataFrame], data: pyspark.sql.DataFrame
