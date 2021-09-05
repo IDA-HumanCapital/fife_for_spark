@@ -22,22 +22,22 @@ Suppose you have a dataset that looks like this:
 
 The entities with IDs 0, 2, and 4 are observed in the dataset in 2019.
 
-While FIFE offers a significantly larger suite of models designed to answer a variety of questions, FIFEforSpark is mainly focused on one question: what are each of their probabilities of being observed in any future year? Fortunately, FIFEforSpark can estimate answers to these questions for any unbalanced panel dataset.
+While FIFE offers a significantly larger suite of models designed to answer a variety of questions, FIFEforSpark is mainly focused on one question: what are each of their <[CO comment 1a](_review.md)> probabilities of being observed in any future year? Fortunately, FIFEforSpark can estimate answers to these questions for any unbalanced panel dataset.
 
 Exactly like FIFE, FIFEforSpark unifies survival analysis and multivariate time series analysis. Tools for the former neglect future states of survival; tools for the latter neglect the possibility of discontinuation. Traditional forecasting approaches for each, such as proportional hazards and vector autoregression (VAR), respectively, impose restrictive functional forms that limit forecasting performance. FIFEforSpark supports one of the best approaches for maximizing forecasting performance: gradient-boosted trees (using MMLSpark's LightGBM).
 
-FIFEforSpark is simple to use and the syntax is almost identical to that of FIFE; however, given that this is meant to be run in the Spark environment in a Python notebook, there are some notable differences. First, the package 'mmlspark' must already be installed and attached to the cluster. Unfortunately, the PyPI version of MMLSpark is not compatible with FIFEforSpark. As such, FIFE is best utilized in a Databricks notebook.  
+FIFEforSpark is simple to use and the syntax is almost identical to that of FIFE; however, given that this is meant to be run in the Spark environment in a Python notebook, there are some notable differences. First, the package 'mmlspark' must already be installed and attached to the cluster. <[CO comment 1b](_review.md)> Unfortunately, the PyPI version of MMLSpark is not compatible with FIFEforSpark. As such, FIFE is best utilized in a Databricks notebook. <[CO comment 1c](_review.md)> 
 
-If you are working in a Python IDE and have pyspark installed, you can run the following. Again, the PyPI version of MMLSpark is not complete and will cause this code to fail; however, if MMLSpark is installed correctly, the following code should work.
+If you are working in a Python IDE and have pyspark installed <[CO comment 1d](_review.md)>, you can run the following. Again, the PyPI version of MMLSpark is not complete and will cause this code to fail; however, if MMLSpark is installed correctly, the following code should work. 
 
 ```python
-import findspark
+import findspark <[CO comment 1e](_review.md)>
 findspark.init()
 import pyspark # only run after findspark.init()
 from pyspark.sql import SparkSession
 
 from fifeforspark.processors import PanelDataProcessor
-from fifeforspark.lgb_modelers import LGBSurvivalModeler
+from fifeforspark.lgb_modelers import LGBSurvivalModeler 
 
 spark = SparkSession.builder.getOrCreate()
 data_processor = PanelDataProcessor(data=spark.read.csv(path_to_your_data))
@@ -51,6 +51,7 @@ forecasts = modeler.forecast()
 
 If you are working in a Databricks python notebook, you may run something like the following code, where 'your_table' is the name of your table.
 
+<[CO comment 1f](_review.md)>
 ```python
 from fifeforspark.processors import PanelDataProcessor
 from fifeforspark.lgb_modelers import LGBSurvivalModeler
