@@ -49,10 +49,15 @@ class GBTModeler(LGBModeler):
         indexers = [StringIndexer(inputCol=column, outputCol=column + "_index").setHandleInvalid("keep")
                     for column in self.categorical_features]
         feature_columns = [column + "_index" for column in self.categorical_features] + self.numeric_features
+        feature_columns = [x for x in train_data.columns if x in feature_columns] # reset the order
         assembler = VectorAssembler(inputCols=feature_columns, outputCol='features').setHandleInvalid("keep")
+        max_bins = max([32]+[len(train_data[feature].unique()) for feature in self.categorical_features])
+
         if params is None:
             gbt_model = gbt(featuresCol="features",
                             labelCol="_label",
+                            maxIter=5,
+                            maxBins=max_bins,
                             weightCol=data.filter(~data[self.validation_col])[self.weight_col]
                             if self.weight_col
                             else None
@@ -61,6 +66,8 @@ class GBTModeler(LGBModeler):
             gbt_model = gbt(featuresCol="features",
                             labelCol="_label",
                             **params,
+                            maxIter=5,
+                            maxBins=max_bins,
                             weightCol=data.filter(~data[self.validation_col])[self.weight_col]
                             if self.weight_col
                             else None
