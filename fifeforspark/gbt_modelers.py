@@ -51,14 +51,14 @@ class GBTModeler(LGBModeler):
             train_data = train_data.withColumn('weight', lit(1))
             self.weight_col = "weight"
 
-        indexers = [StringIndexer(inputCol=column, outputCol=column + "_index").setHandleInvalid("skip")
+        indexers = [StringIndexer(inputCol=column, outputCol=column + "_index").setHandleInvalid("keep")
                     for column in self.categorical_features]
         print(self.categorical_features)
         feature_columns = [column + "_index" for column in self.categorical_features] + [x for x in train_data.columns
                                                                                          if x in self.numeric_features]
         print(train_data.columns)
         print(feature_columns)
-        assembler = VectorAssembler(inputCols=feature_columns, outputCol='features').setHandleInvalid("skip")
+        assembler = VectorAssembler(inputCols=feature_columns, outputCol='features').setHandleInvalid("keep")
 
         if params is None:
             gbt_model = gbt(featuresCol="features",
