@@ -1,5 +1,5 @@
 """FIFE modelers based on Pyspark GBT, which trains gradient-boosted trees."""
-from typing import List, Union
+from typing import Union
 
 import pyspark.sql
 from pyspark.ml import Pipeline
@@ -7,6 +7,7 @@ from pyspark.ml.feature import VectorAssembler, StringIndexer
 from fifeforspark.base_modelers import SurvivalModeler
 from fifeforspark.lgb_modelers import LGBModeler
 from pyspark.ml.classification import GBTClassifier as gbt
+from pyspark.sql.functions import lit
 
 
 class GBTModeler(LGBModeler):
@@ -46,28 +47,28 @@ class GBTModeler(LGBModeler):
         train_data = data.filter(~data[self.validation_col])[
             self.categorical_features + self.numeric_features + [data['_label']]
             ]
+
+        weight_col = self.weight_col
+        if not self.weight_col:
+            train_data = train_data.withColumn('weight', lit(1))
+            weight_col = "weight"
+
         indexers = [StringIndexer(inputCol=column, outputCol=column + "_index").setHandleInvalid("keep")
                     for column in self.categorical_features]
-        feature_columns = [column + "_index" for column in self.categorical_features] + self.numeric_features
-        feature_columns = [x for x in train_data.columns if x in feature_columns] # reset the order
+        feature_columns = [column + "_index" for column in self.categorical_features] + [x for x in train_data.columns
+                                                                                         if x in self.numeric_features]
         assembler = VectorAssembler(inputCols=feature_columns, outputCol='features').setHandleInvalid("keep")
 
         if params is None:
             gbt_model = gbt(featuresCol="features",
                             labelCol="_label",
-                            maxIter=5,
-                            weightCol=data.filter(~data[self.validation_col])[self.weight_col]
-                            if self.weight_col
-                            else None
+                            weightCol=weight_col
                             )
         else:
             gbt_model = gbt(featuresCol="features",
                             labelCol="_label",
                             **params,
-                            maxIter=5,
-                            weightCol=data.filter(~data[self.validation_col])[self.weight_col]
-                            if self.weight_col
-                            else None
+                            weightCol=weight_col
                             )
 
         pipeline = Pipeline(stages=[*indexers, assembler, gbt_model])
