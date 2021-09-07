@@ -8,7 +8,7 @@ from fifeforspark.base_modelers import SurvivalModeler
 from fifeforspark.lgb_modelers import LGBModeler
 from pyspark.ml.classification import GBTClassifier as gbt
 from pyspark.sql.functions import lit
-
+from warnings import warn
 
 class GBTModeler(LGBModeler):
 
@@ -29,6 +29,8 @@ class GBTModeler(LGBModeler):
         Returns:
             Single ML Pipeline model
         """
+        warn("Current functionality does not support any missing values. Please remove the missing values or label"
+             "them as their own category")
 
         if subset is None:
             subset = ~self.data[self.test_col] & ~self.data[self.predict_col]
