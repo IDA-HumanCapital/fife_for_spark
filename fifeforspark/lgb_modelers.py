@@ -10,11 +10,12 @@ from pyspark.sql.types import FloatType
 from fifeforspark.base_modelers import default_subset_to_all, Modeler, SurvivalModeler
 import databricks.koalas as ks
 from tqdm import tqdm
+from warnings import warn
 
 try:
     import mmlspark.lightgbm.LightGBMClassifier as lgb
 except:
-    print("MMLSpark could not be imported. You will not be able to use LGBModeler ")
+    warn("MMLSpark could not be imported. You will not be able to use LGBModeler ")
 
 
 class LGBModeler(Modeler):
