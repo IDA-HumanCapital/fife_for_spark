@@ -29,7 +29,7 @@ class GBTModeler(LGBModeler):
         Returns:
             Single ML Pipeline model
         """
-        warn("Current functionality does not support any missing values. Please remove the missing values or label"
+        warn("Current functionality does not support any missing values. Please remove any missing values or label"
              "them as their own category")
 
         if subset is None:
