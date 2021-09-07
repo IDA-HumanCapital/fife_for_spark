@@ -9,6 +9,8 @@ from pyspark.sql.functions import udf, date_format, col
 from pyspark.sql.types import FloatType
 from fifeforspark.base_modelers import default_subset_to_all, Modeler, SurvivalModeler
 import databricks.koalas as ks
+from tqdm import tqdm
+
 try:
     import mmlspark.lightgbm.LightGBMClassifier as lgb
 except:
@@ -91,8 +93,9 @@ class LGBModeler(Modeler):
             List of Pyspark ML Pipeline models
         """
         models = []
-
-        for time_horizon in range(self.n_intervals):
+        pbar = tqdm(range(self.n_intervals))
+        for time_horizon in pbar:
+            pbar.set_description(f"Training models. Currently training model for time horizon {time_horizon}")
             model = self.train_single_model(
                 time_horizon=time_horizon,
                 params=params,
