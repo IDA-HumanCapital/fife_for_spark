@@ -1,5 +1,5 @@
 """FIFE modelers based on Pyspark GBT, which trains gradient-boosted trees."""
-from typing import List, Union
+from typing import Union
 
 import pyspark.sql
 from pyspark.ml import Pipeline
