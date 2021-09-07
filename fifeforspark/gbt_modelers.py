@@ -47,9 +47,11 @@ class GBTModeler(LGBModeler):
         train_data = data.filter(~data[self.validation_col])[
             self.categorical_features + self.numeric_features + [data['_label']]
             ]
+
+        weight_col = self.weight_col
         if not self.weight_col:
             train_data = train_data.withColumn('weight', lit(1))
-            self.weight_col = "weight"
+            weight_col = "weight"
 
         indexers = [StringIndexer(inputCol=column, outputCol=column + "_index").setHandleInvalid("keep")
                     for column in self.categorical_features]
@@ -60,13 +62,13 @@ class GBTModeler(LGBModeler):
         if params is None:
             gbt_model = gbt(featuresCol="features",
                             labelCol="_label",
-                            weightCol=self.weight_col
+                            weightCol=weight_col
                             )
         else:
             gbt_model = gbt(featuresCol="features",
                             labelCol="_label",
                             **params,
-                            weightCol=self.weight_col
+                            weightCol=weight_col
                             )
 
         pipeline = Pipeline(stages=[*indexers, assembler, gbt_model])
