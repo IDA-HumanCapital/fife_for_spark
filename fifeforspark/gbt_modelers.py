@@ -53,11 +53,8 @@ class GBTModeler(LGBModeler):
 
         indexers = [StringIndexer(inputCol=column, outputCol=column + "_index").setHandleInvalid("keep")
                     for column in self.categorical_features]
-        print(self.categorical_features)
         feature_columns = [column + "_index" for column in self.categorical_features] + [x for x in train_data.columns
                                                                                          if x in self.numeric_features]
-        print(train_data.columns)
-        print(feature_columns)
         assembler = VectorAssembler(inputCols=feature_columns, outputCol='features').setHandleInvalid("keep")
 
         if params is None:
