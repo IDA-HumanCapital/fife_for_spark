@@ -11,8 +11,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql.types import DoubleType
 from pyspark.sql.functions import lit, when, monotonically_increasing_id, mean, col
 from pyspark.ml.evaluation import BinaryClassificationEvaluator
-from warnings import warn
-
+from tqdm import tqdm
 
 def default_subset_to_all(    
     subset: Union[None, pyspark.sql.DataFrame], data: pyspark.sql.DataFrame
@@ -446,8 +445,7 @@ class SurvivalModeler(Modeler):
             subset=self.data.select('subset'), cumulative=(not self.allow_gaps))
         lead_lengths = np.arange(self.n_intervals) + 1
         metrics = []
-        for lead_length in lead_lengths:
-            print(f'Now evaluating lead length: {lead_length} of {len(lead_lengths)}')
+        for lead_length in tqdm(lead_lengths, desc = "Evaluating Model by Lead Length"):
             actuals = self.label_data(int(lead_length - 1))
             if subset is None:
                 actuals = actuals.withColumn('subset', actuals[self.test_col] &
