@@ -14,7 +14,7 @@ from warnings import warn
 
 try:
     import mmlspark.lightgbm.LightGBMClassifier as lgb
-except:
+except ImportError:
     warn("MMLSpark could not be imported. You will not be able to use LGBModeler ")
 
 
