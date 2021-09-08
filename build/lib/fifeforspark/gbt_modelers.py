@@ -52,7 +52,7 @@ class GBTModeler(LGBModeler):
 
         weight_col = self.weight_col
         if not self.weight_col:
-            train_data = train_data.withColumn('weight', lit(1))
+            train_data = train_data.withColumn('weight', lit(1.0))
             weight_col = "weight"
 
         indexers = [StringIndexer(inputCol=column, outputCol=column + "_index").setHandleInvalid("keep")
