@@ -19,7 +19,7 @@ def setup_config():
     """Create configuration dictionary of model parameters."""
     config_dict = {
         "BATCH_SIZE": 512,
-        "CATEGORICAL_SUFFIXES": [],
+        "CATEGORICAL_SUFFIXES": (),
         "DATA_FILE_NAME": "Input_Data",
         "DATA_FILE_PATH": "",
         "DENSE_LAYERS": 2,
@@ -31,12 +31,12 @@ def setup_config():
         "INDIVIDUAL_IDENTIFIER": "SSNSCR",
         "MAX_EPOCHS": 256,
         "MAX_NULL_SHARE": 0.999,
-        "MAX_UNIQUE_NUMERIC_CATS": 1024,
+        "MAX_UNIQUE_CATEGORIES": 1024,
         "MIN_SURVIVORS_IN_TRAIN": 64,
         "NON_CAT_MISSING_VALUE": -1,
         "NOTES_FOR_LOG": "No config notes specified",
         "NODES_PER_DENSE_LAYER": 512,
-        "NUMERIC_SUFFIXES": [],
+        "NUMERIC_SUFFIXES": (),
         "PATIENCE": 4,
         "PROPORTIONAL_HAZARDS": False,
         "QUANTILES": 5,
@@ -221,14 +221,14 @@ def setup_dataframe():
 
     # Add validation, test, and predict_obs flags
     data["_validation"] = pd.Series(
-        rn.choice([True, False], size=len(data), p=[0.1, 0.9])
+        np.random.choice([True, False], size=len(data), p=[0.1, 0.9])
     )
     data["_test"] = (
-        pd.Series(rn.choice([True, False], size=len(data), p=[0.1, 0.9]))
+        pd.Series(np.random.choice([True, False], size=len(data), p=[0.1, 0.9]))
         & ~data["_validation"]
     )
     data["_predict_obs"] = (
-        pd.Series(rn.choice([True, False], size=len(data), p=[0.1, 0.9]))
+        pd.Series(np.random.choice([True, False], size=len(data), p=[0.1, 0.9]))
         & ~data["_validation"]
         & ~data["_test"]
     )

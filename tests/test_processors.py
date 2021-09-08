@@ -80,7 +80,7 @@ def test_process_single_column(setup_config, setup_dataframe):
     degenerate_cols = [
         col
         for col in setup_dataframe.columns
-        if (setup_dataframe.dropna(subset = [col]).first() is None) | (setup_dataframe[col].distinct().count() < 2)
+        if (setup_dataframe.dropna(subset = [col]).first() is None) | (setup_dataframe.select(col).distinct().count() < 2)
     ]
     categorical_cols = [
         col
