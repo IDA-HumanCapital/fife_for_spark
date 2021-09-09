@@ -17,6 +17,13 @@ fifeforspark.lgb\_modelers module
    :undoc-members:
    :show-inheritance:
 
+fifeforspark.gbt\_modelers module
+---------------------------------
+
+.. automodule:: fifeforspark.gbt_modelers
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 fifeforspark.processors module
 ------------------------------
