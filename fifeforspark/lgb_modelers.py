@@ -2,7 +2,6 @@
 
 from typing import List, Union
 
-import mmlspark.lightgbm.LightGBMClassifier as lgb
 import pyspark.sql
 from pyspark.ml import Pipeline
 from pyspark.ml.feature import VectorAssembler, StringIndexer
@@ -10,6 +9,13 @@ from pyspark.sql.functions import udf, date_format, col
 from pyspark.sql.types import FloatType
 from fifeforspark.base_modelers import default_subset_to_all, Modeler, SurvivalModeler
 import databricks.koalas as ks
+from warnings import warn
+
+try:
+    import mmlspark.lightgbm.LightGBMClassifier as lgb
+except ImportError:
+    warn("MMLSpark could not be imported. You will not be able to use LGBModeler ")
+
 
 class LGBModeler(Modeler):
     """Train a gradient-boosted tree model for each lead length using MMLSpark's LightGBM.
