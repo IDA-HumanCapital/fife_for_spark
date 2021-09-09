@@ -22,4 +22,17 @@ instructions for how users can install MMLSpark and FIFEforSpark and attach to c
 	recommend eliminating all but the line that applies to Databricks
 	(e.g., `data_processor = PanelDataProcessor(data = spark.sql("select * from your_table"))`)
 
+2) utils.py
+    a) `create_example_data1` function is very slow; also not clear to the user what the difference is between
+	`create_example_data1` and `create_example_data2` functions
 
+3) lgb_modelers.py
+    a) Encountering the following error when running `LGBSurvivalModeler(data=data_processor.data).build_model()`:
+	`java.lang.NoClassDefFoundError: org/apache/spark/ml/util/MLWritable$class`; note that importing 
+	`fifeforspark.lgb_modelers` succeeds without triggering the warning that MMLSpark could not be imported;
+	using 8.3 Databricks Runtime, mmlspark_2.11-1.0.0-rc3 Maven coordinates for MMLSpark; full traceback is in 
+	[3a_error_buildmodel.txt](3a_error_buildmodel.txt)
+    b) `tqdm` package is not included in the 8.3 Databricks Runtime, and trying to import LGBSurvivalModeler
+	from fifeforspark.lgb_modelers returns following error: `ModuleNotFoundError: No module named tqdm`;
+	not a huge issue as users can install it themselves from PyPI, but it could be helpful to list in one place
+	all additional packages that FIFE users need to install to make the switch to FIFEforSpark

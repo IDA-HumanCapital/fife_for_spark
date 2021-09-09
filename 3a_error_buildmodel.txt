@@ -1,0 +1,91 @@
+Training models. Currently training model for time horizon 0:   0%|          | 0/17 [00:00<?, ?it/s]
+java.lang.NoClassDefFoundError: org/apache/spark/ml/util/MLWritable$class
+---------------------------------------------------------------------------
+Py4JJavaError                             Traceback (most recent call last)
+<command-844094149078514> in <module>
+----> 1 modeler.build_model()
+
+/databricks/python/lib/python3.8/site-packages/fifeforspark/lgb_modelers.py in build_model(self, n_intervals, params)
+     75         else:
+     76             self.n_intervals = self.set_n_intervals()
+---> 77         self.model = self.train(
+     78             params=params
+     79         )
+
+/databricks/python/lib/python3.8/site-packages/fifeforspark/lgb_modelers.py in train(self, params, subset)
+     98         for time_horizon in pbar:
+     99             pbar.set_description(f"Training models. Currently training model for time horizon {time_horizon}")
+--> 100             model = self.train_single_model(
+    101                 time_horizon=time_horizon,
+    102                 params=params,
+
+/databricks/python/lib/python3.8/site-packages/fifeforspark/lgb_modelers.py in train_single_model(self, time_horizon, params, subset)
+    157         feature_columns = [column + "_index" for column in self.categorical_features] + self.numeric_features
+    158         assembler = VectorAssembler(inputCols=feature_columns, outputCol='features').setHandleInvalid("keep")
+--> 159         lgb_model = lgb(featuresCol="features",
+    160                         labelCol="_label",
+    161                         **params[time_horizon],
+
+/databricks/spark/python/pyspark/__init__.py in wrapper(self, *args, **kwargs)
+    112             raise TypeError("Method %s forces keyword arguments." % func.__name__)
+    113         self._input_kwargs = kwargs
+--> 114         return func(self, **kwargs)
+    115     return wrapper
+    116 
+
+/local_disk0/spark-2f3bfc77-1c83-4bc9-8574-1927148b86e1/userFiles-8733ba33-5b83-482c-8464-95134948642b/addedFile2496447546510535567mmlspark_2_11_1_0_0_rc3-86e1e.jar/mmlspark/lightgbm/_LightGBMClassifier.py in __init__(self, baggingFraction, baggingFreq, baggingSeed, binSampleCount, boostFromAverage, boostingType, categoricalSlotIndexes, categoricalSlotNames, defaultListenPort, driverListenPort, earlyStoppingRound, featureFraction, featuresCol, featuresShapCol, improvementTolerance, initScoreCol, isProvideTrainingMetric, isUnbalance, labelCol, lambdaL1, lambdaL2, leafPredictionCol, learningRate, maxBin, maxBinByFeature, maxDeltaStep, maxDepth, metric, minDataInLeaf, minGainToSplit, minSumHessianInLeaf, modelString, negBaggingFraction, numBatches, numIterations, numLeaves, numTasks, objective, parallelism, posBaggingFraction, predictionCol, probabilityCol, rawPredictionCol, repartitionByGroupingColumn, slotNames, thresholds, timeout, topK, useBarrierExecutionMode, validationIndicatorCol, verbosity, weightCol)
+     81     def __init__(self, baggingFraction=1.0, baggingFreq=0, baggingSeed=3, binSampleCount=200000, boostFromAverage=True, boostingType="gbdt", categoricalSlotIndexes=[], categoricalSlotNames=[], defaultListenPort=12400, driverListenPort=0, earlyStoppingRound=0, featureFraction=1.0, featuresCol="features", featuresShapCol="", improvementTolerance=0.0, initScoreCol=None, isProvideTrainingMetric=False, isUnbalance=False, labelCol="label", lambdaL1=0.0, lambdaL2=0.0, leafPredictionCol="", learningRate=0.1, maxBin=255, maxBinByFeature=[], maxDeltaStep=0.0, maxDepth=-1, metric="", minDataInLeaf=20, minGainToSplit=0.0, minSumHessianInLeaf=0.001, modelString="", negBaggingFraction=1.0, numBatches=0, numIterations=100, numLeaves=31, numTasks=0, objective="binary", parallelism="data_parallel", posBaggingFraction=1.0, predictionCol="prediction", probabilityCol="probability", rawPredictionCol="rawPrediction", repartitionByGroupingColumn=True, slotNames=[], thresholds=None, timeout=1200.0, topK=20, useBarrierExecutionMode=False, validationIndicatorCol=None, verbosity=1, weightCol=None):
+     82         super(_LightGBMClassifier, self).__init__()
+---> 83         self._java_obj = self._new_java_obj("com.microsoft.ml.spark.lightgbm.LightGBMClassifier")
+     84         self.baggingFraction = Param(self, "baggingFraction", "baggingFraction: Bagging fraction (default: 1.0)")
+     85         self._setDefault(baggingFraction=1.0)
+
+/databricks/spark/python/pyspark/ml/wrapper.py in _new_java_obj(java_class, *args)
+     64             java_obj = getattr(java_obj, name)
+     65         java_args = [_py2java(sc, arg) for arg in args]
+---> 66         return java_obj(*java_args)
+     67 
+     68     @staticmethod
+
+/databricks/spark/python/lib/py4j-0.10.9-src.zip/py4j/java_gateway.py in __call__(self, *args)
+   1566 
+   1567         answer = self._gateway_client.send_command(command)
+-> 1568         return_value = get_return_value(
+   1569             answer, self._gateway_client, None, self._fqn)
+   1570 
+
+/databricks/spark/python/pyspark/sql/utils.py in deco(*a, **kw)
+    115     def deco(*a, **kw):
+    116         try:
+--> 117             return f(*a, **kw)
+    118         except py4j.protocol.Py4JJavaError as e:
+    119             converted = convert_exception(e.java_exception)
+
+/databricks/spark/python/lib/py4j-0.10.9-src.zip/py4j/protocol.py in get_return_value(answer, gateway_client, target_id, name)
+    324             value = OUTPUT_CONVERTER[type](answer[2:], gateway_client)
+    325             if answer[1] == REFERENCE_TYPE:
+--> 326                 raise Py4JJavaError(
+    327                     "An error occurred while calling {0}{1}{2}.\n".
+    328                     format(target_id, ".", name), value)
+
+Py4JJavaError: An error occurred while calling None.com.microsoft.ml.spark.lightgbm.LightGBMClassifier.
+: java.lang.NoClassDefFoundError: org/apache/spark/ml/util/MLWritable$class
+	at com.microsoft.ml.spark.lightgbm.LightGBMClassifier.<init>(LightGBMClassifier.scala:25)
+	at com.microsoft.ml.spark.lightgbm.LightGBMClassifier.<init>(LightGBMClassifier.scala:27)
+	at sun.reflect.NativeConstructorAccessorImpl.newInstance0(Native Method)
+	at sun.reflect.NativeConstructorAccessorImpl.newInstance(NativeConstructorAccessorImpl.java:62)
+	at sun.reflect.DelegatingConstructorAccessorImpl.newInstance(DelegatingConstructorAccessorImpl.java:45)
+	at java.lang.reflect.Constructor.newInstance(Constructor.java:423)
+	at py4j.reflection.MethodInvoker.invoke(MethodInvoker.java:247)
+	at py4j.reflection.ReflectionEngine.invoke(ReflectionEngine.java:380)
+	at py4j.Gateway.invoke(Gateway.java:250)
+	at py4j.commands.ConstructorCommand.invokeConstructor(ConstructorCommand.java:80)
+	at py4j.commands.ConstructorCommand.execute(ConstructorCommand.java:69)
+	at py4j.GatewayConnection.run(GatewayConnection.java:251)
+	at java.lang.Thread.run(Thread.java:748)
+Caused by: java.lang.ClassNotFoundException: org.apache.spark.ml.util.MLWritable$class
+	at java.net.URLClassLoader.findClass(URLClassLoader.java:382)
+	at java.lang.ClassLoader.loadClass(ClassLoader.java:419)
+	at com.databricks.backend.daemon.driver.ClassLoaders$LibraryClassLoader.loadClass(ClassLoaders.scala:151)
+	at java.lang.ClassLoader.loadClass(ClassLoader.java:352)
+	... 13 more
