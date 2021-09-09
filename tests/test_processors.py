@@ -8,6 +8,7 @@ import pytest
 import findspark
 from pyspark.sql import SparkSession
 from pyspark.sql.utils import AnalysisException
+from pyspark.sql.functions import rand
 from pyspark.sql.types import StringType
 findspark.init()
 spark = SparkSession.builder.getOrCreate()
@@ -93,12 +94,10 @@ def test_process_single_column(setup_config, setup_dataframe):
         config=setup_config, data=setup_dataframe
     )
     processed_col = data_processor.process_single_column(indiv_id_col).select(indiv_id_col)
-    if not processed_col == setup_dataframe.select(indiv_id_col):
-        processed_col.show()
-        setup_dataframe.select(indiv_id_col).show()
+    #TODO: Find a better way to compare pyspark dfs
+    if not processed_col.collect() == setup_dataframe.select(indiv_id_col).collect():
         errors_list.append("Individual identifier column {indiv_id_col} modified.")
     for degenerate_col in degenerate_cols:
-        #TODO: Fix this: Cannot resolve completely null var given inputs
         try: 
             processed_col = data_processor.process_single_column(degenerate_col).select(degenerate_col)
         except AnalysisException:
@@ -123,10 +122,48 @@ def test_check_panel_consistency(setup_config, setup_dataframe):
         config=setup_config, data=setup_dataframe
     )
     data_processor.data = data_processor.data.union(spark.createDataFrame(data_processor.data.take(1)))
-    #Fix the iloc 1 line
+    #TODO: Fix the iloc 1 line
     with pytest.raises(AssertionError):
         data_processor.check_panel_consistency()
         
+def test_sort_panel_data(setup_config, setup_dataframe):
+    """Test that sort_panel_data re-sorts scrambled observations."""
+    data_processor = processors.PanelDataProcessor(
+        config=setup_config, data=setup_dataframe
+    )
+    first_ten_rows_already_sorted = spark.createDataFrame(data_processor.data.take(10))
+    data_processor.data = data_processor.data.orderBy(rand())
+    data_processor.data = data_processor.sort_panel_data()
+    first_ten_rows_scrambled_then_sorted = spark.createDataFrame(data_processor.data.take(10))
+    first_ten_rows_already_sorted.show()
+    first_ten_rows_scrambled_then_sorted.show()
+    assert first_ten_rows_scrambled_then_sorted.collect() == first_ten_rows_already_sorted.collect()
+
+def test_flag_validation_individuals(setup_config, setup_dataframe):
+    """Test that validation set is given share of observations and contains
+    all observations of each individual therein.
+    """
+    data_processor = processors.PanelDataProcessor(
+        config=setup_config, data=setup_dataframe
+    )
+    error_tolerance = 0.1
+    data_processor = data_processor.withColumn('validation', data_processor.flag_validation_individuals())
+    share_in_validation_sample = data_processor.data.agg({'validation':'mean'}).first()[0]
+    share_approximately_correct = (
+        (data_processor.config["VALIDATION_SHARE"] - error_tolerance)
+        <= share_in_validation_sample
+    ) and (
+        share_in_validation_sample
+        <= (data_processor.config["VALIDATION_SHARE"] + error_tolerance)
+    )
+    rates_individuals_within_validation_group = data_processor.data.groupBy(
+        data_processor.config["INDIVIDUAL_IDENTIFIER"]
+    )["validation"].mean()
+    individual_consistently_in_validation_group = (
+        rates_individuals_within_validation_group == 1
+    ) | (rates_individuals_within_validation_group == 0)
+    assert share_approximately_correct
+    assert np.mean(individual_consistently_in_validation_group) == 1
 
 
 SEED = 9999
