@@ -27,6 +27,9 @@ class RFCModeler(LGBModeler):
         Returns:
             Single ML Pipeline model
         """
+        warn("Current functionality does not support any missing values when using in DataBricks. Please remove any "
+             "missing values or label them as their own category. If you're not using this package in DataBricks, "
+             "current functionality does support missing values. Further investigation into this issue is underway.")
 
         if subset is None:
             subset = ~self.data[self.test_col] & ~self.data[self.predict_col]
