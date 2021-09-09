@@ -5,5 +5,4 @@
 !docs/source/*
 docs/_build/
 !dist/*
-build/*
 !examples/*
