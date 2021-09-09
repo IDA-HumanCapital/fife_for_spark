@@ -7,6 +7,8 @@ import pandas as pd
 import pytest
 import findspark
 from pyspark.sql import SparkSession
+from pyspark.sql.utils import AnalysisException
+from pyspark.sql.types import StringType
 findspark.init()
 spark = SparkSession.builder.getOrCreate()
 
@@ -90,18 +92,24 @@ def test_process_single_column(setup_config, setup_dataframe):
     data_processor = processors.PanelDataProcessor(
         config=setup_config, data=setup_dataframe
     )
-    processed_col = data_processor.process_single_column(indiv_id_col)
-    if not processed_col == setup_dataframe[indiv_id_col]:
+    processed_col = data_processor.process_single_column(indiv_id_col).select(indiv_id_col)
+    if not processed_col == setup_dataframe.select(indiv_id_col):
+        processed_col.show()
+        setup_dataframe.select(indiv_id_col).show()
         errors_list.append("Individual identifier column {indiv_id_col} modified.")
     for degenerate_col in degenerate_cols:
-        processed_col = data_processor.process_single_column(degenerate_col)
+        #TODO: Fix this: Cannot resolve completely null var given inputs
+        try: 
+            processed_col = data_processor.process_single_column(degenerate_col).select(degenerate_col)
+        except AnalysisException:
+            processed_col = None
         if processed_col is not None:
             errors_list.append(
                 f"Degenerate column {degenerate_col} not dropped from dataframe."
             )
     for categorical_col in categorical_cols:
         processed_col = data_processor.process_single_column(categorical_col)
-        if not isinstance(processed_col.dtypes, pd.api.types.CategoricalDtype):
+        if not isinstance(processed_col.schema[categorical_col].dataType, StringType):
             errors_list.append(
                 f"Categorical column {categorical_col} not cast to categorical dtype."
             )

@@ -285,4 +285,5 @@ def setup_dataframe():
                       ])
     
     spark_data = spark.createDataFrame(data, schema = schema)
+    spark_data.cache()
     return spark_data
