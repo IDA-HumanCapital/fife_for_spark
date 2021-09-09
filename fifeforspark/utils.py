@@ -125,7 +125,7 @@ def import_data_file(path: str = "Input Data") -> pyspark.sql.DataFrame:
         elif path.endswith(".parquet"):
             data = spark.read.load(path)
         else:
-            raise Exception(
+            raise TypeError(
                 "Data file extension is invalid.")
     return data
 

@@ -1,4 +1,4 @@
-"""FIFE modelers based on LightGBM, which trains gradient-boosted trees."""
+"""FIFEforSpark modelers based on LightGBM, which trains gradient-boosted trees."""
 
 from typing import List, Union
 
@@ -9,6 +9,8 @@ from pyspark.sql.functions import udf, date_format, col
 from pyspark.sql.types import FloatType
 from fifeforspark.base_modelers import default_subset_to_all, Modeler, SurvivalModeler
 import databricks.koalas as ks
+from tqdm import tqdm
+
 from warnings import warn
 
 try:
@@ -68,6 +70,7 @@ class LGBModeler(Modeler):
         Returns:
             None
         """
+
         if n_intervals:
             self.n_intervals = n_intervals
         else:
@@ -92,8 +95,9 @@ class LGBModeler(Modeler):
             List of Pyspark ML Pipeline models
         """
         models = []
-
-        for time_horizon in range(self.n_intervals):
+        pbar = tqdm(range(self.n_intervals))
+        for time_horizon in pbar:
+            pbar.set_description(f"Training models. Currently training model for time horizon {time_horizon}")
             model = self.train_single_model(
                 time_horizon=time_horizon,
                 params=params,
