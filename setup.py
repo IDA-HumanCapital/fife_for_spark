@@ -41,7 +41,8 @@ setup(
         "findspark",
         "numpy",
         "pandas",
-        "databricks"
+        "databricks",
+        "tqdm"
     ],
     #extras_require={"shap": ["shap"]},
     entry_points={
