@@ -5,6 +5,6 @@
 !docs/source/*
 docs/_build/
 !dist/*
-!build/*
-!examples/*
 !tests/*
+build/*
+!examples/*
