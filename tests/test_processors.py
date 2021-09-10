@@ -1,4 +1,4 @@
-"""Conduct unit testing for fife.processors module."""
+"""Conduct unit testing for fifeforspark.processors module."""
 import sys, os
 sys.path.append(os.path.abspath("C:/Users/jwang/Documents/GitHub/fife_for_spark/fifeforspark"))
 import processors
@@ -9,7 +9,7 @@ import findspark
 from pyspark.sql import SparkSession
 from pyspark.sql.utils import AnalysisException
 from pyspark.sql.functions import rand
-from pyspark.sql.types import StringType
+from pyspark.sql.types import StringType, DoubleType
 findspark.init()
 spark = SparkSession.builder.getOrCreate()
 
@@ -135,8 +135,6 @@ def test_sort_panel_data(setup_config, setup_dataframe):
     data_processor.data = data_processor.data.orderBy(rand())
     data_processor.data = data_processor.sort_panel_data()
     first_ten_rows_scrambled_then_sorted = spark.createDataFrame(data_processor.data.take(10))
-    first_ten_rows_already_sorted.show()
-    first_ten_rows_scrambled_then_sorted.show()
     assert first_ten_rows_scrambled_then_sorted.collect() == first_ten_rows_already_sorted.collect()
 
 def test_flag_validation_individuals(setup_config, setup_dataframe):
@@ -146,9 +144,12 @@ def test_flag_validation_individuals(setup_config, setup_dataframe):
     data_processor = processors.PanelDataProcessor(
         config=setup_config, data=setup_dataframe
     )
+    data_processor.data.select('_validation').show()
     error_tolerance = 0.1
-    data_processor = data_processor.withColumn('validation', data_processor.flag_validation_individuals())
-    share_in_validation_sample = data_processor.data.agg({'validation':'mean'}).first()[0]
+    data_processor.data.printSchema()
+    data_processor
+    data_processor.data = data_processor.flag_validation_individuals()
+    share_in_validation_sample = data_processor.data.withColumn('_validation', data_processor.data['_validation'].cast('int')).agg({'_validation':'sum'}).show()#.first()[0]
     share_approximately_correct = (
         (data_processor.config["VALIDATION_SHARE"] - error_tolerance)
         <= share_in_validation_sample

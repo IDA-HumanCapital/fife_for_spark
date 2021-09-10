@@ -56,15 +56,15 @@ def setup_config():
 def fabricate_forecasts():
     """Create faux forecasts for testing."""
     np.random.seed(9999)
-    actual_array = pd.Series([0, 0, 0, 0, 0, 1, 1, 1, 1])
-    predicted_array = pd.Series(np.arange(0.1, 0.99, 0.1))
+    actual_array = spark.createDataFrame(pd.DataFrame({'actuals':[0, 0, 0, 0, 0, 1, 1, 1, 1]}))
+    predicted_array = spark.createDataFrame(pd.DataFrame({'actuals':(np.arange(0.1, 0.99, 0.1))}))
     faux_forecasts = dict()
     faux_forecasts["AUROC=1"] = [actual_array, predicted_array]
     faux_forecasts["AUROC=0"] = [
         actual_array,
-        predicted_array.sort_values(ascending=False),
+        predicted_array.orderBy('actuals',ascending=False),
     ]
-    faux_forecasts["empty actual"] = [pd.Series([]), predicted_array]
+    faux_forecasts["empty actual"] = [spark.createDataFrame([], StructType([])), predicted_array]
     return faux_forecasts
 
 
