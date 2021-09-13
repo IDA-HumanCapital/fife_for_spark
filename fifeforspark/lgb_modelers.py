@@ -58,7 +58,8 @@ class LGBModeler(Modeler):
     def build_model(
             self,
             n_intervals: Union[None, int] = None,
-            params: dict = None
+            params: dict = None,
+            validation_early_stopping: bool = True
     ) -> None:
         """
         Train and store a sequence of gradient-boosted tree models.
@@ -66,6 +67,7 @@ class LGBModeler(Modeler):
         Args:
             n_intervals: the maximum periods ahead the model will predict.
             params: Parameters for model tuning
+            validation_early_stopping: whether to implement early stopping
 
         Returns:
             None
@@ -76,13 +78,15 @@ class LGBModeler(Modeler):
         else:
             self.n_intervals = self.set_n_intervals()
         self.model = self.train(
-            params=params
+            params=params,
+            validation_early_stopping=validation_early_stopping
         )
 
     def train(
             self,
             params: Union[None, dict] = None,
-            subset: Union[None, pyspark.sql.DataFrame] = None
+            subset: Union[None, pyspark.sql.DataFrame] = None,
+            validation_early_stopping: bool = True
     ) -> List[pyspark.ml.pipeline.PipelineModel]:
         """
         Train a LightGBM model for each lead length.
@@ -90,6 +94,7 @@ class LGBModeler(Modeler):
         Args:
             params: Parameters for model tuning
             subset: Boolean column for subsetting the data
+            validation_early_stopping: whether to implement early stopping
 
         Returns:
             List of Pyspark ML Pipeline models
@@ -101,7 +106,8 @@ class LGBModeler(Modeler):
             model = self.train_single_model(
                 time_horizon=time_horizon,
                 params=params,
-                subset=subset
+                subset=subset,
+                validation_early_stopping = validation_early_stopping
             )
             models.append(model)
 
@@ -111,7 +117,8 @@ class LGBModeler(Modeler):
             self,
             time_horizon: int,
             params: Union[None, dict] = None,
-            subset: Union[None, pyspark.sql.DataFrame] = None
+            subset: Union[None, pyspark.sql.DataFrame] = None,
+            validation_early_stopping: bool = True
     ) -> pyspark.ml.pipeline.PipelineModel:
         """
         Train a LightGBM model for a single lead length.
@@ -120,6 +127,7 @@ class LGBModeler(Modeler):
             time_horizon: The number of periods out for which to build this model
             params: Parameters for model tuning
             subset: Boolean column for subsetting the data
+            validation_early_stopping: whether to implement early stopping
 
         Returns:
             Single ML Pipeline model
@@ -157,13 +165,26 @@ class LGBModeler(Modeler):
                     for column in self.categorical_features]
         feature_columns = [column + "_index" for column in self.categorical_features] + self.numeric_features
         assembler = VectorAssembler(inputCols=feature_columns, outputCol='features').setHandleInvalid("keep")
-        lgb_model = lgb(featuresCol="features",
-                        labelCol="_label",
-                        **params[time_horizon],
-                        weightCol=data.filter(~data[self.validation_col])[self.weight_col]
-                        if self.weight_col
-                        else None
-                        )
+
+        if validation_early_stopping:
+            lgb_model = lgb(featuresCol="features",
+                            labelCol="_label",
+                            **params[time_horizon],
+                            earlyStoppingRound=25,
+                            metric='binary_logloss',
+                            validationIndicatorCol=self.validation_col,
+                            weightCol=data.filter(~data[self.validation_col])[self.weight_col]
+                            if self.weight_col
+                            else None
+                            )
+        else:
+            lgb_model = lgb(featuresCol="features",
+                            labelCol="_label",
+                            **params[time_horizon],
+                            weightCol=data.filter(~data[self.validation_col])[self.weight_col]
+                            if self.weight_col
+                            else None
+                            )
         pipeline = Pipeline(stages=[*indexers, assembler, lgb_model])
         model = pipeline.fit(train_data)
         return model
