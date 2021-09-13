@@ -59,7 +59,6 @@ class LGBModeler(Modeler):
             self,
             n_intervals: Union[None, int] = None,
             params: dict = None,
-            validation_early_stopping: bool = True
     ) -> None:
         """
         Train and store a sequence of gradient-boosted tree models.
@@ -67,7 +66,6 @@ class LGBModeler(Modeler):
         Args:
             n_intervals: the maximum periods ahead the model will predict.
             params: Parameters for model tuning
-            validation_early_stopping: whether to implement early stopping
 
         Returns:
             None
@@ -92,7 +90,6 @@ class LGBModeler(Modeler):
         Args:
             params: Parameters for model tuning
             subset: Boolean column for subsetting the data
-            validation_early_stopping: whether to implement early stopping
 
         Returns:
             List of Pyspark ML Pipeline models
@@ -123,7 +120,6 @@ class LGBModeler(Modeler):
             time_horizon: The number of periods out for which to build this model
             params: Parameters for model tuning
             subset: Boolean column for subsetting the data
-            validation_early_stopping: whether to implement early stopping
 
         Returns:
             Single ML Pipeline model
@@ -162,12 +158,11 @@ class LGBModeler(Modeler):
         feature_columns = [column + "_index" for column in self.categorical_features] + self.numeric_features
         assembler = VectorAssembler(inputCols=feature_columns, outputCol='features').setHandleInvalid("keep")
 
-        if self.config['VALIDATION_EARLY_STOPPING']:
+        if self.config.get('VALIDATION_EARLY_STOPPING', True):
             lgb_model = lgb(featuresCol="features",
                             labelCol="_label",
                             **params[time_horizon],
                             earlyStoppingRound=self.config.get("PATIENCE", 4),
-                            metric='binary_logloss',
                             validationIndicatorCol=self.validation_col,
                             weightCol=self.weight_col
                             if self.weight_col
