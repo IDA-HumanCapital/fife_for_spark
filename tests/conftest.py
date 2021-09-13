@@ -4,7 +4,7 @@ import datetime as dt
 
 from dateutil.relativedelta import relativedelta
 from pyspark.sql import SparkSession
-from pyspark.sql.types import StructField, StructType, IntegerType, FloatType, StringType, DateType
+from pyspark.sql.types import StructField, StructType, IntegerType, FloatType, StringType, DateType, DoubleType, BooleanType
 import numpy as np
 import pandas as pd
 import random as rn
@@ -224,11 +224,12 @@ def setup_dataframe():
         np.random.choice([True, False], size=len(data), p=[0.1, 0.9])
     )
     data["_test"] = (
-        pd.Series(np.random.choice([True, False], size=len(data), p=[0.1, 0.9]))
-        & ~data["_validation"]
-    )
+        pd.Series(np.random.choice([True, False],
+                  size=len(data), p=[0.1, 0.9]))
+         & ~data["_validation"])
     data["_predict_obs"] = (
-        pd.Series(np.random.choice([True, False], size=len(data), p=[0.1, 0.9]))
+        pd.Series(np.random.choice([True, False], size=len(
+            data), p=[0.1, 0.9]))
         & ~data["_validation"]
         & ~data["_test"]
     )
@@ -274,9 +275,9 @@ def setup_dataframe():
                       StructField('nonneg_trend_numeric_var', FloatType(), True),
                       StructField('constant_categorical_var', StringType(), True),
                       StructField('duplicate_nonneg_uniform_numeric_var', FloatType(), True),
-                      StructField('_validation', StringType(), True),
-                      StructField('_test', StringType(), True),
-                      StructField('_predict_obs', StringType(), True),
+                      StructField('_validation', BooleanType(), True),
+                      StructField('_test', BooleanType(), True),
+                      StructField('_predict_obs', BooleanType(), True),
                       StructField('_period', IntegerType(), True),
                       StructField('_maximum_lead', IntegerType(), True),
                       StructField('_duration', IntegerType(), True),

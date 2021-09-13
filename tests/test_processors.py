@@ -144,27 +144,28 @@ def test_flag_validation_individuals(setup_config, setup_dataframe):
     data_processor = processors.PanelDataProcessor(
         config=setup_config, data=setup_dataframe
     )
-    data_processor.data.select('_validation').show()
     error_tolerance = 0.1
-    data_processor.data.printSchema()
-    data_processor
     data_processor.data = data_processor.flag_validation_individuals()
-    share_in_validation_sample = data_processor.data.withColumn('_validation', data_processor.data['_validation'].cast('int')).agg({'_validation':'sum'}).show()#.first()[0]
+    data_processor.data = data_processor.data.withColumn('validation', data_processor.data['val_flagged'].cast('int'))
+    share_in_validation_sample = data_processor.data.agg({'validation':'mean'}).first()[0]
+    
     share_approximately_correct = (
         (data_processor.config["VALIDATION_SHARE"] - error_tolerance)
         <= share_in_validation_sample
     ) and (
         share_in_validation_sample
         <= (data_processor.config["VALIDATION_SHARE"] + error_tolerance)
-    )
-    rates_individuals_within_validation_group = data_processor.data.groupBy(
+    ) 
+    rates_individuals_within_validation_group = data_processor.data.select(['validation', data_processor.config["INDIVIDUAL_IDENTIFIER"]]).groupBy(
         data_processor.config["INDIVIDUAL_IDENTIFIER"]
-    )["validation"].mean()
+    ).mean('validation')
+    
     individual_consistently_in_validation_group = (
-        rates_individuals_within_validation_group == 1
-    ) | (rates_individuals_within_validation_group == 0)
+        rates_individuals_within_validation_group.select(((rates_individuals_within_validation_group['avg(validation)'] == 1
+                                                          ) | (rates_individuals_within_validation_group['avg(validation)'] == 0)).alias('val_bool').cast('int')))
+    individual_consistently_in_validation_group.show()
     assert share_approximately_correct
-    assert np.mean(individual_consistently_in_validation_group) == 1
+    assert individual_consistently_in_validation_group.agg({'val_bool':'mean'}).first()[0]
 
 
 SEED = 9999
