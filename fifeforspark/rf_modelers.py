@@ -24,6 +24,7 @@ class RFCModeler(LGBModeler):
             time_horizon: The number of periods out for which to build this model
             params: Parameters for model tuning
             subset: Boolean column for subsetting the data
+
         Returns:
             Single ML Pipeline model
         """
