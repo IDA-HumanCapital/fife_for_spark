@@ -78,15 +78,13 @@ class LGBModeler(Modeler):
         else:
             self.n_intervals = self.set_n_intervals()
         self.model = self.train(
-            params=params,
-            validation_early_stopping=validation_early_stopping
+            params=params
         )
 
     def train(
             self,
             params: Union[None, dict] = None,
             subset: Union[None, pyspark.sql.DataFrame] = None,
-            validation_early_stopping: bool = True
     ) -> List[pyspark.ml.pipeline.PipelineModel]:
         """
         Train a LightGBM model for each lead length.
@@ -106,8 +104,7 @@ class LGBModeler(Modeler):
             model = self.train_single_model(
                 time_horizon=time_horizon,
                 params=params,
-                subset=subset,
-                validation_early_stopping=validation_early_stopping
+                subset=subset
             )
             models.append(model)
 
@@ -117,8 +114,7 @@ class LGBModeler(Modeler):
             self,
             time_horizon: int,
             params: Union[None, dict] = None,
-            subset: Union[None, pyspark.sql.DataFrame] = None,
-            validation_early_stopping: bool = True
+            subset: Union[None, pyspark.sql.DataFrame] = None
     ) -> pyspark.ml.pipeline.PipelineModel:
         """
         Train a LightGBM model for a single lead length.
@@ -166,7 +162,7 @@ class LGBModeler(Modeler):
         feature_columns = [column + "_index" for column in self.categorical_features] + self.numeric_features
         assembler = VectorAssembler(inputCols=feature_columns, outputCol='features').setHandleInvalid("keep")
 
-        if validation_early_stopping:
+        if self.config['VALIDATION_EARLY_STOPPING']:
             lgb_model = lgb(featuresCol="features",
                             labelCol="_label",
                             **params[time_horizon],

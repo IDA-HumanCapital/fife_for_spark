@@ -198,7 +198,12 @@ class FIFEArgParser(argparse.ArgumentParser):
             help="A boolean value indicating whether or not to cache designated objects. Caching improves algorithm runtime, but is not applicable on larger datasets due to memory errors.",
         )
         self.add_argument(
-            "--PATIENCE",
+            "--VALIDATION_EARLY_STOPPING",
             type=bool,
+            help="Whether to implement early stopping"
+        )
+        self.add_argument(
+            "--PATIENCE",
+            type=int,
             help="The number of early stopping rounds for LightGBM.",
         )
