@@ -158,9 +158,9 @@ class LGBModeler(Modeler):
         data = data.filter(subset)
         data = self.subset_for_training_horizon(data, time_horizon)
 
-        train_data = data.filter(~data[self.validation_col])[
-            self.categorical_features + self.numeric_features + [data['_label']]
-            ] 
+        train_data = data[
+            self.categorical_features + self.numeric_features + ['_label', self.validation_col]
+            ]
         indexers = [StringIndexer(inputCol=column, outputCol=column + "_index").setHandleInvalid("keep")
                     for column in self.categorical_features]
         feature_columns = [column + "_index" for column in self.categorical_features] + self.numeric_features
@@ -173,17 +173,13 @@ class LGBModeler(Modeler):
                             earlyStoppingRound=25,
                             metric='binary_logloss',
                             validationIndicatorCol=self.validation_col,
-                            weightCol=data.filter(~data[self.validation_col])[self.weight_col]
-                            if self.weight_col
-                            else None
+                            weightCol=self.weight_col
                             )
         else:
             lgb_model = lgb(featuresCol="features",
                             labelCol="_label",
                             **params[time_horizon],
-                            weightCol=data.filter(~data[self.validation_col])[self.weight_col]
-                            if self.weight_col
-                            else None
+                            weightCol=self.weight_col
                             )
         pipeline = Pipeline(stages=[*indexers, assembler, lgb_model])
         model = pipeline.fit(train_data)
