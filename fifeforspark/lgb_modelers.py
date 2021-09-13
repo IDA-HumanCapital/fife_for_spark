@@ -170,7 +170,7 @@ class LGBModeler(Modeler):
             lgb_model = lgb(featuresCol="features",
                             labelCol="_label",
                             **params[time_horizon],
-                            earlyStoppingRound=25,
+                            earlyStoppingRound=self.config.get("PATIENCE", 4),
                             metric='binary_logloss',
                             validationIndicatorCol=self.validation_col,
                             weightCol=self.weight_col
