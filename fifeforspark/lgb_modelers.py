@@ -170,12 +170,16 @@ class LGBModeler(Modeler):
                             metric='binary_logloss',
                             validationIndicatorCol=self.validation_col,
                             weightCol=self.weight_col
+                            if self.weight_col
+                            else None
                             )
         else:
             lgb_model = lgb(featuresCol="features",
                             labelCol="_label",
                             **params[time_horizon],
                             weightCol=self.weight_col
+                            if self.weight_col
+                            else None
                             )
         pipeline = Pipeline(stages=[*indexers, assembler, lgb_model])
         model = pipeline.fit(train_data)
