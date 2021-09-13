@@ -233,8 +233,9 @@ class LGBModeler(Modeler):
         Returns:
             None
         """
-        for model in lgb.model:
-            model.write().overwrite().save(path)
+        for i, lead_specific_model in enumerate(self.model):
+            lead_specific_model.write().overwrite().save(f'{path}_model{i}')
+
 
 
 class LGBSurvivalModeler(LGBModeler, SurvivalModeler):

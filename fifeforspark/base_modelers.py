@@ -173,7 +173,6 @@ class Modeler(ABC):
                 given time horizon.
         """
         findspark.init()
-        self.spark = SparkSession.builder.getOrCreate()
         
         ks.set_option('compute.ops_on_diff_frames', True)
         
