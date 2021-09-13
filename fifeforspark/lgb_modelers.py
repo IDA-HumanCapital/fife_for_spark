@@ -107,7 +107,7 @@ class LGBModeler(Modeler):
                 time_horizon=time_horizon,
                 params=params,
                 subset=subset,
-                validation_early_stopping = validation_early_stopping
+                validation_early_stopping=validation_early_stopping
             )
             models.append(model)
 
