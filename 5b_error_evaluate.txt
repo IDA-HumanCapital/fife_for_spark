@@ -1,0 +1,17 @@
+Internal error, sorry. Attach your notebook to a different cluster or restart the current cluster.
+java.lang.RuntimeException: abort: DriverClient destroyed
+	at com.databricks.backend.daemon.driver.DriverClient.$anonfun$poll$3(DriverClient.scala:440)
+	at scala.concurrent.Future.$anonfun$flatMap$1(Future.scala:307)
+	at scala.concurrent.impl.Promise.$anonfun$transformWith$1(Promise.scala:41)
+	at scala.concurrent.impl.CallbackRunnable.run(Promise.scala:64)
+	at com.databricks.threading.NamedExecutor$$anon$2.$anonfun$run$1(NamedExecutor.scala:356)
+	at scala.runtime.java8.JFunction0$mcV$sp.apply(JFunction0$mcV$sp.java:23)
+	at com.databricks.logging.UsageLogging.$anonfun$withAttributionContext$1(UsageLogging.scala:266)
+	at scala.util.DynamicVariable.withValue(DynamicVariable.scala:62)
+	at com.databricks.logging.UsageLogging.withAttributionContext(UsageLogging.scala:261)
+	at com.databricks.logging.UsageLogging.withAttributionContext$(UsageLogging.scala:258)
+	at com.databricks.threading.NamedExecutor.withAttributionContext(NamedExecutor.scala:285)
+	at com.databricks.threading.NamedExecutor$$anon$2.run(NamedExecutor.scala:355)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1128)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:628)
+	at java.base/java.lang.Thread.run(Thread.java:834)
