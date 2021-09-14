@@ -81,7 +81,8 @@ that comment 4b (below) will apply to this module/class as well.)
 
     b) [9/14 Update] Per Ed's recommendations, tried the `evaluate` method after setting 
 	LGBSurvivalModeler(config={'CACHE':True}); encountered DriverClient destroyed error (may not necessarily
-	be related); full traceback is in [5b_error_evaluate.txt](5b_error_evaluate.txt)
+	be related); full traceback is in [5b_error_evaluate.txt](5b_error_evaluate.txt); on re-run, encountered
+	SparkException error in [5b_p2_error_evaluate.txt](5b_p2_error_evaluate.txt)
 
 	The `evaluate` method is very slow, even for a relatively small dataset; projected time is 2+ hours for
 	a (10k person x 48 period) data set, whereas data processing took 37 seconds and model training/producing
