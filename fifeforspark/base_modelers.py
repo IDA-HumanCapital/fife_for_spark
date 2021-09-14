@@ -445,7 +445,7 @@ class SurvivalModeler(Modeler):
             subset=self.data.select('subset'), cumulative=(not self.allow_gaps))
         lead_lengths = np.arange(self.n_intervals) + 1
         metrics = []
-        for lead_length in tqdm(lead_lengths, desc = "Evaluating Model by Lead Length"):
+        for lead_length in tqdm(lead_lengths, desc="Evaluating Model by Lead Length"):
             actuals = self.label_data(int(lead_length - 1))
             if subset is None:
                 actuals = actuals.withColumn('subset', actuals[self.test_col] &
