@@ -4,7 +4,7 @@ import datetime as dt
 
 from dateutil.relativedelta import relativedelta
 from pyspark.sql import SparkSession
-from pyspark.sql.types import StructField, StructType, IntegerType, FloatType, StringType, DateType, DoubleType, BooleanType
+from pyspark.sql.types import StructField, StructType, IntegerType, FloatType, StringType, DateType, BooleanType
 import numpy as np
 import pandas as pd
 import random as rn
@@ -37,14 +37,8 @@ def setup_config():
         "NOTES_FOR_LOG": "No config notes specified",
         "NODES_PER_DENSE_LAYER": 512,
         "NUMERIC_SUFFIXES": (),
-        "PATIENCE": 4,
-        "PROPORTIONAL_HAZARDS": False,
-        "QUANTILES": 5,
-        "RETENTION_INTERVAL": 1,
         "SEED": 9999,
-        "SHAP_PLOT_ALPHA": 0.5,
-        "SHAP_SAMPLE_SIZE": 128,
-        "TEST_PERIODS": 0,
+        "TEST_INTERVALS": 4,
         "TIME_IDENTIFIER": "FILE_DATE",
         "TREE_MODELS": True,
         "VALIDATION_SHARE": 0.25,
@@ -57,14 +51,17 @@ def fabricate_forecasts():
     """Create faux forecasts for testing."""
     np.random.seed(9999)
     actual_array = spark.createDataFrame(pd.DataFrame({'actuals':[0, 0, 0, 0, 0, 1, 1, 1, 1]}))
-    predicted_array = spark.createDataFrame(pd.DataFrame({'actuals':(np.arange(0.1, 0.99, 0.1))}))
+    actual_array.cache()
+    predicted_array = spark.createDataFrame(pd.DataFrame({'predictions':(np.arange(0.1, 0.99, 0.1))}))
+    predicted_array.cache()
     faux_forecasts = dict()
     faux_forecasts["AUROC=1"] = [actual_array, predicted_array]
     faux_forecasts["AUROC=0"] = [
         actual_array,
-        predicted_array.orderBy('actuals',ascending=False),
+        predicted_array.orderBy('predictions',ascending=False),
     ]
-    faux_forecasts["empty actual"] = [spark.createDataFrame([], StructType([])), predicted_array]
+    emptyRDD = spark.sparkContext.emptyRDD()
+    faux_forecasts["empty actual"] = [spark.createDataFrame(emptyRDD, schema = StructType([StructField('actuals', BooleanType(), True)])), predicted_array]
     return faux_forecasts
 
 
@@ -281,7 +278,7 @@ def setup_dataframe():
                       StructField('_period', IntegerType(), True),
                       StructField('_maximum_lead', IntegerType(), True),
                       StructField('_duration', IntegerType(), True),
-                      StructField('_event_observed', StringType(), True),
+                      StructField('_event_observed', BooleanType(), True),
                       StructField('_spell', IntegerType(), True),
                       ])
     
