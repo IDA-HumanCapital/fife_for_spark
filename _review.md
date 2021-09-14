@@ -79,6 +79,10 @@ that comment 4b (below) will apply to this module/class as well.)
 
     a) Is the attribute set in line 176 (`self.spark = SparkSession.builder.getOrCreate()`) used anywhere else?
 
+    b) The `evaluate` method is very slow, even for a relatively small dataset; projected time is 2+ hours for
+	a (10k person x 48 period) data set, whereas data processing took 37 seconds and model training/producing
+	forecasts took 11 minutes (I think this issue exists with base FIFE as well though)
+
 6) fife-for-spark.readthedocs.io
 
     a) Recommend removing instructions for installing fifeforspark with firewall 
