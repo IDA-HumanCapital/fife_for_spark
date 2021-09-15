@@ -2,6 +2,7 @@
 
 from pyspark.ml import PipelineModel
 from fifeforspark.gbt_modelers import GBTSurvivalModeler
+from pyspark.ml.feature import VectorAssembler, StringIndexer
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
@@ -37,9 +38,7 @@ def test_gbt_train(setup_config, setup_dataframe):
     min_survivors_subset = training_obs_lead_lengths.filter(
         training_obs_lead_lengths["_duration"] > setup_config["MIN_SURVIVORS_IN_TRAIN"]
         )
-    n_intervals = min_survivors_subset.agg(
-            {'_duration': 'max'}
-        ).first()[0]
+    n_intervals = min(4, min_survivors_subset.agg({'_duration': 'max'}).first()[0])
 
     modeler = GBTSurvivalModeler(
         config=setup_config,
@@ -54,12 +53,13 @@ def test_gbt_train(setup_config, setup_dataframe):
             "match number of lead lengths."
         )
     for index, model in enumerate(models_list):
-        if not isinstance(model, lgb.basic.Booster):
+        if not isinstance(model, PipelineModel):
             errors_list.append(
                 f"Model #{index + 1} (of {len(models_list)}) "
-                f"is not an instance of lgb.basic.Booster."
+                f"is not an instance of pysparl.ml.PipelineModel."
             )
-        if not model.params:
+        print(model)
+        if not model.stages[-1].params:
             errors_list.append(
                 f"Model #{index + 1} (of {len(models_list)}) "
                 f"does not have any training parameters."
@@ -67,25 +67,24 @@ def test_gbt_train(setup_config, setup_dataframe):
     assert not errors_list, "Errors occurred: \n{}".format("\n".join(errors_list))
 
 
-def test_gbtm_train_single_model(setup_config, setup_dataframe):
+def test_gbt_train_single_model(setup_config, setup_dataframe):
     """Test that GradientBoostedTreesModeler.train_single_model() returns a
     trained model of type lgb.basic.Booster.
     """
     errors_list = []
-    setup_dataframe["FILE_DATE"] = pd.Series(
-        pd.factorize(setup_dataframe["FILE_DATE"])[0]
-    )
+    ks_df = ks.DataFrame(setup_dataframe)
+    ks_df['FILE_DATE'] = ks_df['FILE_DATE'].factorize(sort = True)[0]
+    setup_dataframe = ks_df.to_spark()
     subset_training_obs = (
         ~setup_dataframe["_validation"]
         & ~setup_dataframe["_test"]
         & ~setup_dataframe["_predict_obs"]
     )
-    training_obs_lead_lengths = setup_dataframe[subset_training_obs][
-        "_duration"
-    ].value_counts()
-    n_intervals = training_obs_lead_lengths[
-        training_obs_lead_lengths > setup_config["MIN_SURVIVORS_IN_TRAIN"]
-    ].index.max()
+    training_obs_lead_lengths = setup_dataframe.filter(subset_training_obs).groupBy('_duration').count()
+    min_survivors_subset = training_obs_lead_lengths[
+        training_obs_lead_lengths['_duration'] > setup_config["MIN_SURVIVORS_IN_TRAIN"]
+    ]
+    n_intervals = min(4, min_survivors_subset.agg({'_duration': 'max'}).first()[0])
     modeler = GBTSurvivalModeler(
         config=setup_config,
         data=setup_dataframe,
@@ -95,14 +94,9 @@ def test_gbtm_train_single_model(setup_config, setup_dataframe):
         if not isinstance(model, PipelineModel):
             errors_list.append(
                 f"Model for time horizon {time_horizon} "
-                f"is not an instance of lgb.basic.Booster."
+                f"is not an instance of pyspark.ml.PipelineModel."
             )
-        if not model.num_trees() > 0:
-            errors_list.append(
-                f"Model for time horizon {time_horizon} "
-                f"was not trained (num_trees == 0)."
-            )
-        if not model.params:
+        if not model.stages[-1].params:
             errors_list.append(
                 f"Model for time horizon {time_horizon} "
                 f"does not have any training parameters."
@@ -126,17 +120,13 @@ def test_gbt_predict(setup_config, setup_dataframe):
         "_spell",
         "SSNSCR",
     ]
-    cat_features_list = setup_dataframe.select_dtypes(
-        include=["object"]
-    ).columns.tolist()
-    for cat_feature in cat_features_list:
-        setup_dataframe[cat_feature] = setup_dataframe[cat_feature].astype("category")
-    numeric_features_list = [
-        x for x in setup_dataframe.columns if x not in cat_features_list + reserved_cols
-    ]
-    setup_dataframe["FILE_DATE"] = pd.Series(
-        pd.factorize(setup_dataframe["FILE_DATE"])[0]
-    )
+    categorical_features_list = [
+                col[0] for col in setup_dataframe.dtypes if col[1] == 'string']
+    numeric_features_list = [feature for feature in setup_dataframe.columns
+                                     if feature not in (categorical_features_list + reserved_cols)]
+    ks_df = ks.DataFrame(setup_dataframe)
+    ks_df['FILE_DATE'] = ks_df['FILE_DATE'].factorize(sort = True)[0]
+    setup_dataframe = ks_df.to_spark()
     subset_training_obs = (
         ~setup_dataframe["_validation"]
         & ~setup_dataframe["_test"]
@@ -147,12 +137,11 @@ def test_gbt_predict(setup_config, setup_dataframe):
         & ~setup_dataframe["_test"]
         & ~setup_dataframe["_predict_obs"]
     )
-    training_obs_lead_lengths = setup_dataframe[subset_training_obs][
-        "_duration"
-    ].value_counts()
-    n_intervals = training_obs_lead_lengths[
+    training_obs_lead_lengths = setup_dataframe.filter(subset_training_obs).groupBy('duration').count()
+    min_survivors_subset = training_obs_lead_lengths[
         training_obs_lead_lengths > setup_config["MIN_SURVIVORS_IN_TRAIN"]
-    ].index.max()
+    ]
+    n_intervals = min(4, min_survivors_subset.agg({'_duration': 'max'}).first()[0])
     models_list = []
     for time_horizon in np.arange(n_intervals):
         train_data = setup_dataframe[
@@ -163,18 +152,18 @@ def test_gbt_predict(setup_config, setup_dataframe):
             & subset_training_obs
         ]
         train_data = lgb.Dataset(
-            train_data[cat_features_list + numeric_features_list],
+            train_data[categorical_features_list + numeric_features_list],
             label=train_data["_duration"] > time_horizon,
         )
-        validation_data = setup_dataframe[
+        validation_data = setup_dataframe.filter(
             (
                 setup_dataframe["_duration"] + setup_dataframe["_event_observed"]
                 > time_horizon
             )
             & subset_validation_obs
-        ]
+        )
         validation_data = train_data.create_valid(
-            validation_data[cat_features_list + numeric_features_list],
+            validation_data[categorical_features_list + numeric_features_list],
             label=validation_data["_duration"] > time_horizon,
         )
         model = lgb.train(
@@ -184,9 +173,26 @@ def test_gbt_predict(setup_config, setup_dataframe):
             early_stopping_rounds=setup_config["PATIENCE"],
             valid_sets=[validation_data],
             valid_names=["validation_set"],
-            categorical_feature=cat_features_list,
+            categorical_feature=categorical_features_list,
             verbose_eval=True,
         )
+        
+        train_data = setup_dataframe.filter(~setup_dataframe['_validation'])[
+            categorical_features_list + numeric_features_list + [setup_dataframe['_label']]
+            ] 
+        indexers = [StringIndexer(inputCol=column, outputCol=column + "_index").setHandleInvalid("keep")
+                    for column in categorical_features_list]
+        feature_columns = [column + "_index" for column in categorical_features_list] + numeric_features_list
+        assembler = VectorAssembler(inputCols=feature_columns, outputCol='features').setHandleInvalid("keep")
+        lgb_model = lgb(featuresCol="features",
+                        labelCol="_label",
+                        validationIndicatorCol='_validation',
+                        weightCol=setup_dataframe.filter(~setup_dataframe['_validation'])[self.weight_col]
+                        if self.weight_col
+                        else None
+                        )
+        pipeline = Pipeline(stages=[*indexers, assembler, lgb_model])
+        model = pipeline.fit(train_data)
         models_list.append(model)
     modeler = GBTSurvivalModeler(
         config=setup_config,
