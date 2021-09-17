@@ -544,8 +544,8 @@ class SurvivalModeler(Modeler):
 
 
 class StateModeler(Modeler):
-    pass
+    raise NotImplementedError("StateModeler not yet implemented.")
 
 
 class ExitModeler(StateModeler):
-    pass
+    raise NotImplementedError("ExitModeler not yet implemented.")

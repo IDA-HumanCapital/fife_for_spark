@@ -236,7 +236,7 @@ class LGBModeler(Modeler):
         """
         for i, lead_specific_model in enumerate(self.model):
             lead_specific_model.write().overwrite().save(f'{path}_model{i}')
-
+        raise NotImplementedError("Model Saving functionality not yet completed.")
 
 
 class LGBSurvivalModeler(LGBModeler, SurvivalModeler):
