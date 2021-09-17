@@ -9,7 +9,7 @@ import findspark
 from pyspark.sql import SparkSession
 from pyspark.sql.utils import AnalysisException
 from pyspark.sql.functions import rand
-from pyspark.sql.types import StringType, DoubleType
+from pyspark.sql.types import StringType
 findspark.init()
 spark = SparkSession.builder.getOrCreate()
 

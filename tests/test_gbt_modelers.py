@@ -1,7 +1,8 @@
 """Conduct unit testing for fife.lgb_modelers module."""
 
-from pyspark.ml import PipelineModel
+from pyspark.ml import PipelineModel, Pipeline
 from fifeforspark.gbt_modelers import GBTSurvivalModeler
+from pyspark.sql.functions import lit
 from pyspark.ml.feature import VectorAssembler, StringIndexer
 import lightgbm as lgb
 import numpy as np
@@ -137,16 +138,16 @@ def test_gbt_predict(setup_config, setup_dataframe):
         & ~setup_dataframe["_test"]
         & ~setup_dataframe["_predict_obs"]
     )
-    training_obs_lead_lengths = setup_dataframe.filter(subset_training_obs).groupBy('duration').count()
+    training_obs_lead_lengths = setup_dataframe.filter(subset_training_obs).groupBy('_duration').count()
     min_survivors_subset = training_obs_lead_lengths[
-        training_obs_lead_lengths > setup_config["MIN_SURVIVORS_IN_TRAIN"]
+        training_obs_lead_lengths['_duration'] > setup_config["MIN_SURVIVORS_IN_TRAIN"]
     ]
     n_intervals = min(4, min_survivors_subset.agg({'_duration': 'max'}).first()[0])
     models_list = []
     for time_horizon in np.arange(n_intervals):
         train_data = setup_dataframe[
             (
-                setup_dataframe["_duration"] + setup_dataframe["_event_observed"]
+                setup_dataframe["_duration"] + setup_dataframe["_event_observed"].cast('int')
                 > time_horizon
             )
             & subset_training_obs
@@ -155,31 +156,32 @@ def test_gbt_predict(setup_config, setup_dataframe):
             train_data[categorical_features_list + numeric_features_list],
             label=train_data["_duration"] > time_horizon,
         )
-        validation_data = setup_dataframe.filter(
+        setup_dataframe = setup_dataframe.withColumn('_validation', setup_dataframe.select(
             (
                 setup_dataframe["_duration"] + setup_dataframe["_event_observed"]
                 > time_horizon
             )
             & subset_validation_obs
-        )
-        validation_data = train_data.create_valid(
-            validation_data[categorical_features_list + numeric_features_list],
-            label=validation_data["_duration"] > time_horizon,
-        )
-        model = lgb.train(
-            {"objective": "binary"},
-            train_data,
-            num_boost_round=setup_config["MAX_EPOCHS"],
-            early_stopping_rounds=setup_config["PATIENCE"],
-            valid_sets=[validation_data],
-            valid_names=["validation_set"],
-            categorical_feature=categorical_features_list,
-            verbose_eval=True,
-        )
+        ))
+        # validation_data = train_data.create_valid(
+        #     validation_data[categorical_features_list + numeric_features_list],
+        #     label=validation_data["_duration"] > time_horizon,
+        # )
+        # model = lgb.train(
+        #     {"objective": "binary"},
+        #     train_data,
+        #     num_boost_round=setup_config["MAX_EPOCHS"],
+        #     early_stopping_rounds=setup_config["PATIENCE"],
+        #     valid_sets=[validation_data],
+        #     valid_names=["validation_set"],
+        #     categorical_feature=categorical_features_list,
+        #     verbose_eval=True,
+        # )
         
         train_data = setup_dataframe.filter(~setup_dataframe['_validation'])[
             categorical_features_list + numeric_features_list + [setup_dataframe['_label']]
             ] 
+        train_data = train_data.withColumn('weight', lit(1.0))
         indexers = [StringIndexer(inputCol=column, outputCol=column + "_index").setHandleInvalid("keep")
                     for column in categorical_features_list]
         feature_columns = [column + "_index" for column in categorical_features_list] + numeric_features_list
@@ -187,9 +189,7 @@ def test_gbt_predict(setup_config, setup_dataframe):
         lgb_model = lgb(featuresCol="features",
                         labelCol="_label",
                         validationIndicatorCol='_validation',
-                        weightCol=setup_dataframe.filter(~setup_dataframe['_validation'])[self.weight_col]
-                        if self.weight_col
-                        else None
+                        weightCol=setup_dataframe.filter(~setup_dataframe['_validation'])['weight']
                         )
         pipeline = Pipeline(stages=[*indexers, assembler, lgb_model])
         model = pipeline.fit(train_data)
