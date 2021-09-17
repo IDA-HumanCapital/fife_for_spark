@@ -276,7 +276,7 @@ class Modeler(ABC):
 
         Args:
             data: Dataset to train on
-            time_horizon: the number of periods for which you're forecasting (i.e. 2 periods out)
+            time_horizon: the number of periods for which you're forecasting (e.g. 2 periods out)
 
         Returns:
             Spark DataFrame with original dataset subsetted
@@ -288,7 +288,7 @@ class Modeler(ABC):
         Return data with an outcome label for each observation.
 
         Args:
-            time_horizon: the number of periods for which you're forecasting (i.e. 2 periods out)
+            time_horizon: the number of periods for which you're forecasting (e.g. 2 periods out)
 
         Returns:
             Data with outcome label added based on time_horizon
@@ -498,7 +498,7 @@ class SurvivalModeler(Modeler):
 
         Args:
             data: Dataset to train on
-            time_horizon: the number of periods for which you're forecasting (i.e. 2 periods out)
+            time_horizon: the number of periods for which you're forecasting (e.g. 2 periods out)
 
         Returns:
             Spark DataFrame with original dataset subsetted
@@ -512,7 +512,7 @@ class SurvivalModeler(Modeler):
         Return data with an outcome label for each observation.
 
         Args:
-            time_horizon: the number of periods for which you're forecasting (i.e. 2 periods out)
+            time_horizon: the number of periods for which you're forecasting (e.g. 2 periods out)
 
         Returns:
             Data with outcome label added based on time_horizon
@@ -526,13 +526,13 @@ class SurvivalModeler(Modeler):
             ids = ids.withColumn(
                 self.config["INDIVIDUAL_IDENTIFIER"] + '_new', ids[self.config["INDIVIDUAL_IDENTIFIER"]])
             ids = ids.withColumn(
-                self.config["TIME_IDENTIFIER"] + '_new', ids[self.config["time_identifer"]] - time_horizon - 1)
+                self.config["TIME_IDENTIFIER"] + '_new', ids[self.config["TIME_IDENTIFIER"]] - time_horizon - 1)
             ids = ids.withColumn('_label', lit(True))
             ids = ids.drop(
                 self.config["INDIVIDUAL_IDENTIFIER"], self.config["TIME_IDENTIFIER"])
 
-            spark_df = spark_df.join(ids, (spark_df[self.config["INDIVIDUAL_IDENTIFIER"]] == ids[self.config["INDIVIDUAL_IDENTIFIER"]]) & (
-                spark_df[self.config["TIME_IDENTIFIER"]] == ids[self.config["TIME_IDENTIFIER"]]), "left")
+            spark_df = spark_df.join(ids, (spark_df[self.config["INDIVIDUAL_IDENTIFIER"]] == ids[self.config["INDIVIDUAL_IDENTIFIER"] + '_new']) & (
+                spark_df[self.config["TIME_IDENTIFIER"]] == ids[self.config["TIME_IDENTIFIER"] + '_new']), "left")
             spark_df = spark_df.drop(
                 self.config["INDIVIDUAL_IDENTIFIER"] + '_new', self.config["TIME_IDENTIFIER"] + '_new')
             spark_df = spark_df.fillna(False, subset=['_label'])
