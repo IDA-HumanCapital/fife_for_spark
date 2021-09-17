@@ -425,8 +425,7 @@ class SurvivalModeler(Modeler):
             A DataFrame containing, for the binary outcomes of survival to each
             lead length, area under the receiver operating characteristic
             curve (AUROC), predicted and actual shares of observations with an
-            outcome of True, and all elements of the confusion matrix. Also
-            includes concordance index over the restricted mean survival time.
+            outcome of True, and all elements of the confusion matrix.
         """
         min_val = 0
         if subset is None:
@@ -523,7 +522,7 @@ class SurvivalModeler(Modeler):
             spark_df[self.duration_col] <= spark_df[self.max_lead_col], spark_df[self.duration_col]).otherwise(spark_df[self.max_lead_col]))
         if self.allow_gaps:
             ids = spark_df[self.config["INDIVIDUAL_IDENTIFIER"],
-                           self.config["time_identifer"]]
+                           self.config["TIME_IDENTIFIER"]]
             ids = ids.withColumn(
                 self.config["INDIVIDUAL_IDENTIFIER"] + '_new', ids[self.config["INDIVIDUAL_IDENTIFIER"]])
             ids = ids.withColumn(
