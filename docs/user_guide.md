@@ -75,7 +75,7 @@ data_processor.build_processed_data()
 Once we've called `data_processor.build_processed_data()`, the completed data will be available at `data_processor.data`. We can then use this in our models. For our first example, let's use a gradient-boosted trees modeler. Like the data building process, we can change modeling parameters in the config argument. Perhaps we prefer a learning rate value of 0.2 rather than the default value of 0.1.
 
 ```python
-survival_modeler = LGBSurvivalModeler(config={'learningRate': 0.2}, 
+survival_modeler = LGBSurvivalModeler(config={'LEARNING_RATE': 0.2}, 
     data=data_processor.data)
 survival_modeler.build_model()
 ```
@@ -214,13 +214,13 @@ In the model training process, we use training data to decide what  conditions t
 
 We begin model training with the entire training data. We sort the data into two subgroups using the feature and feature value that most informatively divides the training data into those who were retained and those who were not. We apply the same information criterion to split each of the resulting subgroups. We stop splitting after reaching any of our stopping criteria, such as a maximum number of splits.
 
-Each leaf of a trained tree contains one or more training observations; the predicted value associated with a leaf is the mean outcome among those training observations. In our example, the mean outcome is the share of Army officers retained. Look at the leaf of the tree which represents Officers with less than six years of service not from the Military Academy and from a state that is not Virginia.[^1] If 90% of such Officers in the training data were retained, the tree will assign a retention probability of 90% to any Officer that falls into the same leaf. If we were just looking for binary classification, this would be assigned to "remain."
+Each leaf of a trained tree contains one or more training observations; the predicted value associated with a leaf is the mean outcome among those training observations. In our example, the mean outcome is the share of Army officers retained. Look at the leaf of the tree which represents Officers with less than six years of service not from the Military Academy and from a state that is not Virginia.<sup>1</sup> If 90% of such Officers in the training data were retained, the tree will assign a retention probability of 90% to any Officer that falls into the same leaf. If we were just looking for binary classification, this would be assigned to "remain."
 
 While we could stop training after one tree, gradient boosting allows us to improve model performance by training more trees to correct model errors. A prediction from a gradient-boosted tree model is a weighted sum of predicted values from the trained trees. Since our binary classification call,  **LGBSurvivalModeler**, uses boosted tree models, the cumulative product of the predictions form an estimated survival function. The survival probabilities at time horizon :math:`t` periods into the future are defined as: 
 
 .. math::
 
-    `Pr(T_{i\tau}\ge t|X_{i\tau})`, 
+    Pr(T_{i\tau}\ge t|X_{i\tau}) 
 
 where :math:`X_{i\tau}` is a vector of feature values for individual :math:`i` at time :math:`\tau`, and :math:`T_{i\tau}` is the number of consecutive future periods the individual remains after time :math:`\tau`. 
 
@@ -281,7 +281,7 @@ TREE_MODELS; default: `true`; type: Boolean
 
 ### Metrics
 
-BY_FEATURE; default: default: `""` (empty string); type: String
+BY\_FEATURE; default: default: `""` (empty string); type: String
 	The name of the feature for which FIFE will also produce separate Metrics_{value}.csv files for each group defined by each unique value of that feature.
 QUANTILES; default: 5; type: Integer
 	The number of similarly-sized bins for which survival and total counts will be reported for each time horizon. Larger values may increase run time and/or evaluation precision.
@@ -289,3 +289,4 @@ RETENTION_INTERVAL; default: 1; type: Integer
 	The number of periods over which retention rates are computed.
 
 ## Frequently Asked Questions (FAQs)
+Note: FAQs are coming soon.
