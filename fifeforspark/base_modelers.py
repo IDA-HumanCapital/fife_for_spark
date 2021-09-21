@@ -513,18 +513,12 @@ class SurvivalModeler(Modeler):
                 )
             return metrics
 
-        predictions_df = self.predict(subset=subset, cumulative=(not self.allow_gaps))
-        predictions = np.array(
-            [
-                predictions_df.select(predictions_df.columns[i]).collect()
-                for i in range(1, len(predictions_df))
-            ]
-        ).T
-        metrics = []
+        predictions = self.predict(subset=subset, cumulative=(not self.allow_gaps))
 
+        metrics = []
         lead_lengths = np.arange(self.n_intervals) + 1
         for lead_length in lead_lengths:
-            labeled_data = self.label_data(lead_length - 1)
+            labeled_data = self.label_data(int(lead_length - 1))
             if subset is None:
                 filtered = self.data.filter(labeled_data[self.test_col])
                 min_val = filtered.select(labeled_data[self.period_col]).agg(
@@ -535,14 +529,14 @@ class SurvivalModeler(Modeler):
                 labeled_data = labeled_data.to_koalas()
                 labeled_data['subset'] = subset.to_koalas()[list(subset.columns)[0]]
                 labeled_data = labeled_data.to_spark()
-            actuals = labeled_data.filter(subset)
+            actuals = labeled_data.filter(labeled_data['subset'])
             actuals = actuals.filter(actuals[self.max_lead_col] >= lead_length)
             weights = actuals.select(self.weight_col).collect() if self.weight_col else None
             actuals = actuals.select("_label").collect()
             metrics.append(
                 compute_metrics_for_binary_outcome_single_node(
                     actuals,
-                    predictions[:, lead_length - 1][actuals.index],
+                    predictions.select(predictions.columns[lead_length-1]).collect()[actuals.index],
                     threshold_positive=threshold_positive,
                     share_positive=share_positive,
                     weights=weights,
