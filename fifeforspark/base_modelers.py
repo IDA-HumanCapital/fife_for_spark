@@ -518,6 +518,7 @@ class SurvivalModeler(Modeler):
         metrics = []
         lead_lengths = np.arange(self.n_intervals) + 1
         for lead_length in lead_lengths:
+            lead_length = int(lead_length)
             labeled_data = self.label_data(int(lead_length - 1))
             if subset is None:
                 filtered = self.data.filter(labeled_data[self.test_col])
@@ -536,7 +537,7 @@ class SurvivalModeler(Modeler):
             metrics.append(
                 compute_metrics_for_binary_outcome_single_node(
                     actuals,
-                    predictions.select(predictions.columns[lead_length-1]).collect()[actuals.index],
+                    predictions.select(predictions.columns[lead_length-1]).collect(),
                     threshold_positive=threshold_positive,
                     share_positive=share_positive,
                     weights=weights,
