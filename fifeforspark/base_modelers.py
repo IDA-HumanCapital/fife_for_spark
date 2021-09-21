@@ -513,6 +513,14 @@ class SurvivalModeler(Modeler):
                 )
             return metrics
 
+        if subset is None:
+            filtered = self.data.filter(self.data[self.test_col])
+            min_val = filtered.select(self.data[self.period_col]).agg(
+                {self.period_col: 'min'}).first()[0]
+            self.data = self.data.withColumn('subset', self.data[self.test_col] &
+                                                   (self.data[self.period_col] == min_val))
+            subset = self.data.select('subset')
+
         predictions = self.predict(subset=subset, cumulative=(not self.allow_gaps))
 
         metrics = []
@@ -520,16 +528,9 @@ class SurvivalModeler(Modeler):
         for lead_length in tqdm(lead_lengths, desc="Evaluating Model by Lead Length"):
             lead_length = int(lead_length)
             labeled_data = self.label_data(int(lead_length - 1))
-            if subset is None:
-                filtered = self.data.filter(labeled_data[self.test_col])
-                min_val = filtered.select(labeled_data[self.period_col]).agg(
-                    {self.period_col: 'min'}).first()[0]
-                labeled_data = labeled_data.withColumn('subset', labeled_data[self.test_col] &
-                                                 (labeled_data[self.period_col] == min_val))
-            else:
-                labeled_data = labeled_data.to_koalas()
-                labeled_data['subset'] = subset.to_koalas()[list(subset.columns)[0]]
-                labeled_data = labeled_data.to_spark()
+            labeled_data = labeled_data.to_koalas()
+            labeled_data['subset'] = subset.to_koalas()[list(subset.columns)[0]]
+            labeled_data = labeled_data.to_spark()
             actuals = labeled_data.filter(labeled_data['subset'])
             actuals = actuals.filter(actuals[self.max_lead_col] >= lead_length)
             weights = actuals.select(self.weight_col).collect() if self.weight_col else None
