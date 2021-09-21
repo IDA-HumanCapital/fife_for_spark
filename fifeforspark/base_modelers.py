@@ -12,8 +12,10 @@ from pyspark.sql.types import DoubleType
 from pyspark.sql.functions import lit, when, monotonically_increasing_id, mean, col
 from pyspark.ml.evaluation import BinaryClassificationEvaluator
 from tqdm import tqdm
+from sklearn.metrics import confusion_matrix, r2_score, roc_auc_score
 
-def default_subset_to_all(    
+
+def default_subset_to_all(
     subset: Union[None, pyspark.sql.DataFrame], data: pyspark.sql.DataFrame
 ) -> pyspark.sql.DataFrame:
     """
@@ -429,25 +431,142 @@ class SurvivalModeler(Modeler):
             outcome of True, and all elements of the confusion matrix. Also
             includes concordance index over the restricted mean survival time.
         """
-        min_val = 0
-        if subset is None:
-            filtered = self.data.filter(self.data[self.test_col])
-            min_val = filtered.select(self.data[self.period_col]).agg(
-                {self.period_col: 'min'}).first()[0]
-            self.data = self.data.withColumn('subset', self.data[self.test_col] & 
-                (self.data[self.period_col] == min_val))
-        else:
-            self.data = self.data.to_koalas()
-            self.data['subset'] = subset.to_koalas()[list(subset.columns)[0]]
-            self.data = self.data.to_spark()
+        try:
+            return self.evaluate_single_node(subset=subset,
+                                             threshold_positive=threshold_positive,
+                                             share_positive=share_positive)
+        except MemoryError:
+            return self.evaluate_multi_node(subset=subset,
+                                            threshold_positive=threshold_positive,
+                                            share_positive=share_positive)
 
-        predictions = self.predict(
-            subset=self.data.select('subset'), cumulative=(not self.allow_gaps))
+    def evaluate_single_node(self,
+        subset: Union[None, pyspark.sql.DataFrame] = None,
+        threshold_positive: Union[None, str, float] = 0.5,
+        share_positive: Union[None, str, float] = None,
+    ) -> pd.core.frame.DataFrame:
+
+        def compute_metrics_for_binary_outcome_single_node(
+                actuals: Union[pd.Series, pd.DataFrame],
+                predictions: np.ndarray,
+                threshold_positive: Union[None, str, float] = 0.5,
+                share_positive: Union[None, str, float] = None,
+                weights: Union[None, np.ndarray] = None,
+        ) -> OrderedDict:
+            """Evaluate predicted probabilities against actual binary outcome values.
+            Args:
+                actuals: A Series representing actual Boolean outcome values.
+                predictions: A Series of predicted probabilities of the respective
+                    outcome values.
+                threshold_positive: None, "predicted", or a value in [0, 1]
+                    representing the minimum predicted probability considered to be a
+                    positive prediction; Specify "predicted" to use the predicted share
+                    positive in each time horizon. Overridden by share_positive.
+                share_positive: None, "predicted", or a value in [0, 1] representing
+                    the share of observations with the highest predicted probabilities
+                    considered to have positive predictions. Specify "predicted" to use
+                    the predicted share positive in each time horizon. Probability ties
+                    may cause share of positives in output to exceed given value.
+                    Overrides threshold_positive.
+                weights: A 1-D array of weights with the same length as actuals and predictions.
+                Each prediction contributes to metrics in proportion to its weight. If None, each prediction has the same weight.
+            Returns:
+                An ordered dictionary containing key-value pairs for area under the
+                receiver operating characteristic curve (AUROC), predicted and
+                actual shares of observations with an outcome of True, and all
+                elements of the confusion matrix.
+            """
+            metrics = OrderedDict()
+            if actuals.any() and not actuals.all():
+                metrics["AUROC"] = roc_auc_score(actuals, predictions, sample_weight=weights)
+            else:
+                metrics["AUROC"] = np.nan
+            metrics["Predicted Share"] = np.average(predictions, weights=weights)
+            metrics["Actual Share"] = np.average(actuals, weights=weights)
+            if actuals.empty:
+                (
+                    metrics["True Positives"],
+                    metrics["False Negatives"],
+                    metrics["False Positives"],
+                    metrics["True Negatives"],
+                ) = [0, 0, 0, 0]
+            else:
+                if share_positive == "predicted":
+                    share_positive = metrics["Predicted Share"]
+                if share_positive is not None:
+                    threshold_positive = np.quantile(predictions, 1 - share_positive)
+                elif threshold_positive == "predicted":
+                    threshold_positive = metrics["Predicted Share"]
+                (
+                    metrics["True Positives"],
+                    metrics["False Negatives"],
+                    metrics["False Positives"],
+                    metrics["True Negatives"],
+                ) = (
+                    confusion_matrix(
+                        actuals,
+                        predictions >= threshold_positive,
+                        labels=[True, False],
+                        sample_weight=weights,
+                    ).ravel()
+                     .tolist()
+                )
+            return metrics
+
+        predictions_df = self.predict(subset=subset, cumulative=(not self.allow_gaps))
+        predictions = np.array(
+            [
+                predictions_df.select(predictions_df.columns[i]).collect()
+                for i in range(1, len(predictions_df))
+            ]
+        ).T
+        metrics = []
+
+        lead_lengths = np.arange(self.n_intervals) + 1
+        for lead_length in lead_lengths:
+            labeled_data = self.label_data(lead_length - 1)
+            if subset is None:
+                filtered = self.data.filter(labeled_data[self.test_col])
+                min_val = filtered.select(labeled_data[self.period_col]).agg(
+                    {self.period_col: 'min'}).first()[0]
+                labeled_data = labeled_data.withColumn('subset', labeled_data[self.test_col] &
+                                                 (labeled_data[self.period_col] == min_val))
+            else:
+                labeled_data = labeled_data.to_koalas()
+                labeled_data['subset'] = subset.to_koalas()[list(subset.columns)[0]]
+                labeled_data = labeled_data.to_spark()
+            actuals = labeled_data.filter(subset)
+            actuals = actuals.filter(actuals[self.max_lead_col] >= lead_length)
+            weights = actuals.select(self.weight_col).collect() if self.weight_col else None
+            actuals = actuals.select("_label").collect()
+            metrics.append(
+                compute_metrics_for_binary_outcome_single_node(
+                    actuals,
+                    predictions[:, lead_length - 1][actuals.index],
+                    threshold_positive=threshold_positive,
+                    share_positive=share_positive,
+                    weights=weights,
+                )
+            )
+        metrics = pd.DataFrame(metrics, index=lead_lengths)
+        metrics.index.name = "Lead Length"
+        metrics = metrics.dropna()
+        return metrics
+
+    def evaluate_multi_node(self,
+        subset: Union[None, pyspark.sql.DataFrame] = None,
+        threshold_positive: Union[None, str, float] = 0.5,
+        share_positive: Union[None, str, float] = None,
+    ) -> pd.core.frame.DataFrame:
+
+        predictions = self.predict(subset=subset, cumulative=(not self.allow_gaps))
         lead_lengths = np.arange(self.n_intervals) + 1
         metrics = []
-        for lead_length in tqdm(lead_lengths, desc = "Evaluating Model by Lead Length"):
+        total = -1
+        for lead_length in tqdm(lead_lengths, desc="Evaluating Model by Lead Length"):
             actuals = self.label_data(int(lead_length - 1))
             if subset is None:
+                min_val = actuals.select(actuals['_period']).agg({'_period': 'min'}).first()[0]
                 actuals = actuals.withColumn('subset', actuals[self.test_col] &
                                              (actuals[self.period_col] == min_val))
             else:
@@ -464,17 +583,15 @@ class SurvivalModeler(Modeler):
                 compute_metrics_for_binary_outcomes(
                     actuals,
                     predictions.select(
-                        predictions[int(lead_length - 1)].alias('predictions')).limit(actuals.count()), 
+                        predictions[int(lead_length - 1)].alias('predictions')),
                     total=total,
                     threshold_positive=threshold_positive,
                     share_positive=share_positive,
-                    cache = self.config.get('CACHE', True)
+                    cache=self.config.get('CACHE', True)
                 )
             )
         metrics = pd.DataFrame(metrics, index=lead_lengths)
         metrics.index.name = "Lead Length"
-        metrics["Other Metrics:"] = ""
-        # TODO: Add concordance index functionality
         metrics = metrics.dropna()
         return metrics
 
