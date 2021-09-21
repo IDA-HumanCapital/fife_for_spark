@@ -94,7 +94,6 @@ def test_process_single_column(setup_config, setup_dataframe):
         config=setup_config, data=setup_dataframe
     )
     processed_col = data_processor.process_single_column(indiv_id_col).select(indiv_id_col)
-    #TODO: Find a better way to compare pyspark dfs
     if not processed_col.collect() == setup_dataframe.select(indiv_id_col).collect():
         errors_list.append("Individual identifier column {indiv_id_col} modified.")
     for degenerate_col in degenerate_cols:
@@ -122,7 +121,6 @@ def test_check_panel_consistency(setup_config, setup_dataframe):
         config=setup_config, data=setup_dataframe
     )
     data_processor.data = data_processor.data.union(spark.createDataFrame(data_processor.data.take(1)))
-    #TODO: Fix the iloc 1 line
     with pytest.raises(AssertionError):
         data_processor.check_panel_consistency()
         
@@ -131,10 +129,10 @@ def test_sort_panel_data(setup_config, setup_dataframe):
     data_processor = processors.PanelDataProcessor(
         config=setup_config, data=setup_dataframe
     )
-    first_ten_rows_already_sorted = spark.createDataFrame(data_processor.data.take(10))
+    first_ten_rows_already_sorted = spark.createDataFrame(data_processor.data.select(['SSNSCR', 'FILE_DATE']).take(10))
     data_processor.data = data_processor.data.orderBy(rand())
     data_processor.data = data_processor.sort_panel_data()
-    first_ten_rows_scrambled_then_sorted = spark.createDataFrame(data_processor.data.take(10))
+    first_ten_rows_scrambled_then_sorted = spark.createDataFrame(data_processor.data.select(['SSNSCR', 'FILE_DATE']).take(10))
     assert first_ten_rows_scrambled_then_sorted.collect() == first_ten_rows_already_sorted.collect()
 
 def test_flag_validation_individuals(setup_config, setup_dataframe):
