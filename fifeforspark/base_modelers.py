@@ -33,7 +33,7 @@ def default_subset_to_all(
     return subset
 
 
-def compute_metrics_for_binary_outcomes(
+def compute_metrics_for_binary_outcome(
     actuals: pyspark.sql.DataFrame, predictions: pyspark.sql.DataFrame, total: int,
     threshold_positive: Union[None, str, float] = 0.5, share_positive: Union[None, str, float] = None,
     cache = False
@@ -459,7 +459,7 @@ class SurvivalModeler(Modeler):
             if lead_length == 1:
                 total = actuals.count()
             metrics.append(
-                compute_metrics_for_binary_outcomes(
+                compute_metrics_for_binary_outcome(
                     actuals,
                     predictions.select(
                         predictions[int(lead_length - 1)].alias('predictions')).limit(actuals.count()), 
