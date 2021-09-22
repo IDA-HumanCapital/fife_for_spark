@@ -22,8 +22,7 @@ MMLSpark provides a distributed version of LightGBM, the gradient boosting packa
 
 While there exists a PyPi page for MMLSpark and it is possible to pip install MMLSpark, we recommend that you do not download MMLSpark in this way. This is because the version of MMLSpark available on PyPi has not been updated, and is not compatible with the current versions of Python, Spark, and Scala. Attempting to utilize FIFEforSpark with the PyPi version of MMLSpark will display an error similar to the following, the full Github issue is found [here.](https://github.com/microsoft/SynapseML/issues/718):
 
-<center> ModuleNotFoundError: No module named 'mmlspark.lightgbm._LightGBMClassifier' </center>  
-
+<center> ModuleNotFoundError: No module named 'mmlspark.lightgbm._LightGBMClassifier' </center> <br />
 
 To download a fifeforspark compatible version of MMLSpark, we recommend that you utilize the Maven coordinates available (here)[https://github.com/microsoft/SynapseML/issues/1031]. The recommended Maven coordinates and Maven repository are shown below:   
 
