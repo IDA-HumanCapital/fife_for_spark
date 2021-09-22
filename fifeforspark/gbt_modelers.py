@@ -45,11 +45,11 @@ class GBTModeler(LGBModeler):
         data = self.label_data(time_horizon)
         data = data.filter(subset)
         data = self.subset_for_training_horizon(data, time_horizon)
-
+        
         train_data = data.filter(~data[self.validation_col])[
             self.categorical_features + self.numeric_features + [data['_label']]
             ]
-
+        
         weight_col = self.weight_col
         if not self.weight_col:
             train_data = train_data.withColumn('weight', lit(1.0))

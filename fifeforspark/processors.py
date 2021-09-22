@@ -87,12 +87,15 @@ class DataProcessor:
         Returns:
             Boolean value for whether the column is categorical
         """
-        if col.endswith(self.config.get('CATEGORICAL_SUFFIXES', ())):
-            if col.endswith(self.config.get('NUMERIC_SUFFIXES', ())):
-                print(
-                    f"{col} matches both categorical and numerical suffixes; it will be identified as categorical"
-                )
-            return True
+        try:
+            if col.endswith(self.config.get('CATEGORICAL_SUFFIXES', ())):
+                if col.endswith(self.config.get('NUMERIC_SUFFIXES', ())):
+                    print(
+                        f"{col} matches both categorical and numerical suffixes; it will be identified as categorical"
+                    )
+                return True
+        except TypeError:
+            raise TypeError("'NUMERIC_SUFFIXES' and 'CATEGORICAL_SUFFIXES' must be either strings or tuples of strings.")
         if isinstance(self.data.schema[col].dataType, (DateType, TimestampType)):
             return False
         if not isinstance(self.data.schema[col].dataType, (IntegerType, LongType, ShortType,
@@ -102,9 +105,6 @@ class DataProcessor:
                     f"{col} matches numeric suffix but is non-numeric; identified as categorical"
                 )
             return True
-        if isinstance(self.data.schema[col].dataType, (IntegerType, LongType, ShortType,
-                                                       ByteType, FloatType, DoubleType, DecimalType)):
-            return False
         if (col.endswith(self.config.get('NUMERIC_SUFFIXES', ()))) or (
                 self.data.select(col).distinct().count() > self.config.get('MAX_UNIQUE_CATEGORIES', 1024)):
             return False
