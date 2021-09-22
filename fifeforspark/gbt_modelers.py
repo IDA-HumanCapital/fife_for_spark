@@ -19,7 +19,7 @@ class GBTModeler(LGBModeler):
             subset: Union[None, pyspark.sql.DataFrame] = None
     ) -> pyspark.ml.pipeline.PipelineModel:
         """
-        Train a LightGBM model for a single lead length.
+        Train a Pyspark ML GBTClassifier model for a single lead length.
 
         Args:
             time_horizon: The number of periods out for which to build this model

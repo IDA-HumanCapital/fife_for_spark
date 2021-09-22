@@ -7,7 +7,7 @@ Simply put, Apache Spark is a software language that supports cluster computatio
 
 
 ## What is PySpark?
-While the original Apache Spark is written in Scala, PySpark is a package which extends Apache Spark functionality to Python. Necessary for this is the Py4J package, which allows Python to interact with Java Virtual Machine (JVM) objects. In conclusion, PySpark creates a Python API for Apache Spark<sup>3</sup>, this allows for the development and application of FIFEforSpark within Python and thus maintains a consistent programming language with the original FIFE.
+While the original Apache Spark is written in Scala, PySpark is a package which extends Apache Spark functionality to Python. Necessary for this is the Py4J package, which allows Python to interact with Java Virtual Machine (JVM) objects. In conclusion, PySpark creates a Python API for Apache Spark,<sup>3</sup> this allows for the development and application of FIFEforSpark within Python and thus maintains a consistent programming language with the original FIFE.
 
 ## Spark and FIFE
 The primary benefits of applying Apache Spark (and Cluster computation in general) is scalability. For our purpose, this is the ability to analyze larger datasets than a singular computer is capable of on it's own. This can be necessary for one of two reasons:   
