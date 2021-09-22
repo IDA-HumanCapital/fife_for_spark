@@ -176,7 +176,7 @@ Data that allows us to observe :math:`y` for different values of :math:`t` infor
 
 ### Traditional Methods for Fitting a Survival Curve
 
-The hardest part about fitting a hazard function is accounting for censoring. A particularly famous and simple method of fitting a forecasting model  under censoring is the [**Kaplan-Meier estimator**](https://www.tandfonline.com/doi/abs/10.1080/01621459.1958.10501452). For each time horizon at  which at least one observation exited, the Kaplan-Meier estimator  computes the share of observations that exited among those observed to  exit or survive at the given time horizon. The Kaplan-Meier estimator is defined as: 
+The hardest part about fitting a hazard function is accounting for censoring. A particularly famous and simple method of fitting a forecasting model  under censoring is the [Kaplan-Meier estimator](https://www.tandfonline.com/doi/abs/10.1080/01621459.1958.10501452). For each time horizon at  which at least one observation exited, the Kaplan-Meier estimator  computes the share of observations that exited among those observed to  exit or survive at the given time horizon. The Kaplan-Meier estimator is defined as: 
 
 .. math::
 
