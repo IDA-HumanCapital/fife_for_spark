@@ -424,6 +424,7 @@ class SurvivalModeler(Modeler):
                 the predicted share positive in each time horizon. Probability ties
                 may cause share of positives in output to exceed given value.
                 Overrides threshold_positive.
+
         Returns:
             A DataFrame containing, for the binary outcomes of survival to each
             lead length, area under the receiver operating characteristic
@@ -432,20 +433,45 @@ class SurvivalModeler(Modeler):
             includes concordance index over the restricted mean survival time.
         """
         try:
-            return self.evaluate_single_node(subset=subset,
+            return self._evaluate_single_node(subset=subset,
                                              threshold_positive=threshold_positive,
                                              share_positive=share_positive)
         except MemoryError:
-            return self.evaluate_multi_node(subset=subset,
+            return self._evaluate_multi_node(subset=subset,
                                             threshold_positive=threshold_positive,
                                             share_positive=share_positive)
 
-    def evaluate_single_node(self,
+    def _evaluate_single_node(self,
         subset: Union[None, pyspark.sql.DataFrame] = None,
         threshold_positive: Union[None, str, float] = 0.5,
         share_positive: Union[None, str, float] = None,
     ) -> pd.core.frame.DataFrame:
+        """
+        Evaluate method for single node. Taken directly from FIFE.
 
+        Args:
+            subset: A Boolean Series that is True for observations over which
+                the metrics will be computed. If None, default to all test
+                observations in the earliest period of the test set.
+            threshold_positive: None, "predicted", or a value in [0, 1]
+                representing the minimum predicted probability considered to be a
+                positive prediction; Specify "predicted" to use the predicted share
+                positive in each time horizon. Overridden by share_positive.
+            share_positive: None, "predicted", or a value in [0, 1] representing
+                the share of observations with the highest predicted probabilities
+                considered to have positive predictions. Specify "predicted" to use
+                the predicted share positive in each time horizon. Probability ties
+                may cause share of positives in output to exceed given value.
+                Overrides threshold_positive.
+
+        Returns:
+            A DataFrame containing, for the binary outcomes of survival to each
+            lead length, area under the receiver operating characteristic
+            curve (AUROC), predicted and actual shares of observations with an
+            outcome of True, and all elements of the confusion matrix. Also
+            includes concordance index over the restricted mean survival time.
+
+        """
         def compute_metrics_for_binary_outcome_single_node(
                 actuals: Union[pd.Series, pd.DataFrame],
                 predictions: np.ndarray,
@@ -454,6 +480,7 @@ class SurvivalModeler(Modeler):
                 weights: Union[None, np.ndarray] = None,
         ) -> OrderedDict:
             """Evaluate predicted probabilities against actual binary outcome values.
+
             Args:
                 actuals: A Series representing actual Boolean outcome values.
                 predictions: A Series of predicted probabilities of the respective
@@ -470,6 +497,7 @@ class SurvivalModeler(Modeler):
                     Overrides threshold_positive.
                 weights: A 1-D array of weights with the same length as actuals and predictions.
                 Each prediction contributes to metrics in proportion to its weight. If None, each prediction has the same weight.
+
             Returns:
                 An ordered dictionary containing key-value pairs for area under the
                 receiver operating characteristic curve (AUROC), predicted and
@@ -551,11 +579,35 @@ class SurvivalModeler(Modeler):
         metrics = metrics.dropna()
         return metrics
 
-    def evaluate_multi_node(self,
+    def _evaluate_multi_node(self,
         subset: Union[None, pyspark.sql.DataFrame] = None,
         threshold_positive: Union[None, str, float] = 0.5,
         share_positive: Union[None, str, float] = None,
     ) -> pd.core.frame.DataFrame:
+
+        """
+        Args:
+            subset: A Boolean Series that is True for observations over which
+                the metrics will be computed. If None, default to all test
+                observations in the earliest period of the test set.
+            threshold_positive: None, "predicted", or a value in [0, 1]
+                representing the minimum predicted probability considered to be a
+                positive prediction; Specify "predicted" to use the predicted share
+                positive in each time horizon. Overridden by share_positive.
+            share_positive: None, "predicted", or a value in [0, 1] representing
+                the share of observations with the highest predicted probabilities
+                considered to have positive predictions. Specify "predicted" to use
+                the predicted share positive in each time horizon. Probability ties
+                may cause share of positives in output to exceed given value.
+                Overrides threshold_positive.
+
+        Returns:
+            A DataFrame containing, for the binary outcomes of survival to each
+            lead length, area under the receiver operating characteristic
+            curve (AUROC), predicted and actual shares of observations with an
+            outcome of True, and all elements of the confusion matrix. Also
+            includes concordance index over the restricted mean survival time.
+        """
 
         predictions = self.predict(subset=subset, cumulative=(not self.allow_gaps))
         lead_lengths = np.arange(self.n_intervals) + 1
