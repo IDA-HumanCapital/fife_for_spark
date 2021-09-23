@@ -477,7 +477,7 @@ class SurvivalModeler(Modeler):
                 elements of the confusion matrix.
             """
             metrics = OrderedDict()
-            if actuals.any()[0] and not actuals.all()[0]:
+            if actuals.any() and not actuals.all():
                 metrics["AUROC"] = roc_auc_score(actuals, predictions, sample_weight=weights)
             else:
                 metrics["AUROC"] = np.nan
@@ -528,13 +528,15 @@ class SurvivalModeler(Modeler):
         for lead_length in tqdm(lead_lengths, desc="Evaluating Model by Lead Length"):
             lead_length = int(lead_length)
             labeled_data = self.label_data(int(lead_length - 1))
-            labeled_data = labeled_data.to_koalas()
-            labeled_data['subset'] = subset.to_koalas()[list(subset.columns)[0]]
-            labeled_data = labeled_data.to_spark()
+            if 'subset' not in labeled_data.columns:
+                labeled_data = labeled_data.to_koalas()
+                labeled_data['subset'] = subset.to_koalas()[list(subset.columns)[0]]
+                labeled_data = labeled_data.to_spark()
+
             actuals = labeled_data.filter(labeled_data['subset'])
             actuals = actuals.filter(actuals[self.max_lead_col] >= lead_length)
             weights = actuals.select(self.weight_col).collect() if self.weight_col else None
-            actuals = actuals.select("_label").toPandas()
+            actuals = actuals.select("_label").toPandas()['_label']
             metrics.append(
                 compute_metrics_for_binary_outcome_single_node(
                     actuals,
