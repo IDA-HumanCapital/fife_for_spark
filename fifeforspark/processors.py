@@ -288,7 +288,7 @@ class PanelDataProcessor(DataProcessor):
             Processed data
         """
 
-        if self.config.get('CACHE', True) == True:
+        if self.config.get('CACHE', False) == True:
             self.data.cache()
         self.check_panel_consistency()
         self.data = self.process_all_columns()
