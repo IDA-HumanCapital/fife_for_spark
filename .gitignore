@@ -4,6 +4,6 @@
 !docs/*
 !docs/source/*
 docs/_build/
-!dist/*
+dist/*
 build/*
 !examples/*
