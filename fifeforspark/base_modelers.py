@@ -637,7 +637,7 @@ class SurvivalModeler(Modeler):
                     total=total,
                     threshold_positive=threshold_positive,
                     share_positive=share_positive,
-                    cache=self.config.get('CACHE', True)
+                    cache=self.config.get('CACHE', False)
                 )
             )
         metrics = pd.DataFrame(metrics, index=lead_lengths)
