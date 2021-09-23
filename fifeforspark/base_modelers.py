@@ -52,7 +52,7 @@ def compute_metrics_for_binary_outcomes(
     Returns:
         Ordered dictionary with evaluation metrics
     """
-    if cache == True:
+    if cache is True:
         predictions.cache()
         actuals.cache()
     actuals = actuals.select(actuals['actuals'].cast(DoubleType()))
@@ -66,7 +66,7 @@ def compute_metrics_for_binary_outcomes(
         actuals = actuals.withColumn("row_id", monotonically_increasing_id())
         preds_and_labs = predictions.join(actuals, predictions.row_id == actuals.row_id).select(
             predictions.predictions, actuals.actuals)
-        if cache == True:
+        if cache is True:
             preds_and_labs.cache()
         preds_and_labs = preds_and_labs.withColumn('rawPrediction', preds_and_labs.predictions.cast(DoubleType()))
         evaluator = BinaryClassificationEvaluator(labelCol='actuals')
