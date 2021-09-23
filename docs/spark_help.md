@@ -24,7 +24,7 @@ While there exists a PyPi page for MMLSpark and it is possible to pip install MM
 
 <center> ModuleNotFoundError: No module named 'mmlspark.lightgbm._LightGBMClassifier' </center> <br />
 
-To download a fifeforspark compatible version of MMLSpark, we recommend that you utilize the Maven coordinates available (here)[https://github.com/microsoft/SynapseML/issues/1031]. The recommended Maven coordinates and Maven repository are shown below:   
+To download a fifeforspark compatible version of MMLSpark, we recommend that you utilize the Maven coordinates available [here](https://github.com/microsoft/SynapseML/issues/1031). The recommended Maven coordinates and Maven repository are shown below:   
 
 
 * Current Maven Coordinates: com.microsoft.ml.spark:mmlspark_2.12:1.0.0-rc3-59-bf337941-SNAPSHOT
