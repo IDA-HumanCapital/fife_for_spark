@@ -1,4 +1,4 @@
-The Finite-Interval Forecasting Engine for Spark (FIFEforSpark) is an adaptation of the Finite-Interval Forecasting Engine for the Apache Spark environment. Currently, it provides machine learning models, specifically a gradient boosted tree model, for discrete-time survival analysis.
+The Finite-Interval Forecasting Engine for Spark (FIFEforSpark) is an adaptation of the Finite-Interval Forecasting Engine for the Apache Spark environment. Currently, it provides machine learning models (specifically a gradient boosted tree model) for discrete-time survival analysis.
 
 If you are already familiar with FIFE, you'll recognize the following explanation of how FIFEforSpark approaches survival analysis. Many of the sections were borrowed heavily from FIFE as this is merely an adaptation of the package to the Spark environment with the exact same methodology. If you would like more information on FIFE, you can read the documentation [here](https://fife.readthedocs.io/en/latest). If you want more documentation on FIFEforSpark, you can go [here](https://fife-for-spark.readthedocs.io/en/latest/)
 

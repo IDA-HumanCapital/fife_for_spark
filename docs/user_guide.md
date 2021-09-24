@@ -288,5 +288,5 @@ QUANTILES; default: 5; type: Integer
 RETENTION_INTERVAL; default: 1; type: Integer
 	The number of periods over which retention rates are computed.
 
-## Frequently Asked Questions (FAQs)
+## Frequently Asked Questions
 Note: FAQs are coming soon.
