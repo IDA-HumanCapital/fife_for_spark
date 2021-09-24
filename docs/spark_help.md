@@ -24,20 +24,21 @@ While there exists a PyPi page for MMLSpark and it is possible to pip install MM
 
 <center> ModuleNotFoundError: No module named 'mmlspark.lightgbm._LightGBMClassifier' </center> <br />
 
-To download a fifeforspark compatible version of MMLSpark, we recommend that you utilize the Maven coordinates available [here](https://github.com/microsoft/SynapseML/issues/1031). The recommended Maven coordinates and Maven repository are shown below:   
+To download a fifeforspark compatible version of MMLSpark on atabricks, we recommend that you utilize the Maven coordinates available [here](https://github.com/microsoft/SynapseML/issues/1031). The recommended Maven coordinates and Maven repository are shown below:   
 
 
 * Current Maven Coordinates: com.microsoft.ml.spark:mmlspark_2.12:1.0.0-rc3-59-bf337941-SNAPSHOT
 * Maven Repository: https://mmlspark.azureedge.net/maven 
 
-We recommend utilizing Databricks Runtime Version 9.0 (Scala 2.12 and Spark 3.1.2) or higher. To download a library in Databricks using Maven Coordinates, initialize a new library within the Workspace and in the desired location. A guide for performing this can be observed from the following [link](https://docs.microsoft.com/en-us/azure/cognitive-services/big-data/getting-started#azure-databricks), but we also outline the process in the below steps:
+In terms of cluster specifications, we recommend utilizing Databricks Runtime Version 9.0 (Scala 2.12 and Spark 3.1.2) or higher. To download a library in Databricks using Maven Coordinates, initialize a new library within the Workspace and in the desired location. A guide for performing this can be observed from the following [link](https://docs.microsoft.com/en-us/azure/cognitive-services/big-data/getting-started#azure-databricks), but we also outline the process in the below steps:
 
 1. Once on Databricks, click on the Workspace button located in the left-hand panel
 2. Right-click anywhere within the Workspace
 3. Hover over the 'Create' button, then click on 'Library'
 4. Once in the library creation menu, change the 'Library Source' to Maven
+5. Within Maven, you will see inputs for the 'Coordinates' and 'Repository', insert the Maven coordinates displayed above. 
 
-Within Maven, you will see inputs for the 'Coordinates' and 'Repository', insert the Maven coordinates displayed above. In general, the MMLSpark Maven coordinates are a combination of a prefix, the current Scala version, and the current master version mentioned above. A general format and the current Maven Coordinates format are both displayed below:
+In general, the MMLSpark Maven coordinates are a combination of a prefix, the current Scala version, and the current master version mentioned above. A general format for Maven Coordinates is displayed below:
 * General Maven Coordinates: com.microsoft.ml.spark:mmlspark\_**insert_current_scala_version** : **insert_current_master_version**
 
 ## Frequently Asked Questions

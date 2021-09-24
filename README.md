@@ -34,7 +34,7 @@ FIFEforSpark is a supported package on PyPI (Python Package Index), thus downloa
 pip install fifeforspark 
 ```
 
-Once installed, generating forecasts is easy. If you are working in a Databricks python notebook, you may run something like the following code, where 'your_table' is the name of your table.
+Once installed, generating forecasts is simple. If you are working in a Databricks python notebook, you may run something like the following code, where 'your_table' is the name of your table.
 
 ```python
 from fifeforspark.processors import PanelDataProcessor
