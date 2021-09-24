@@ -655,6 +655,8 @@ class SurvivalModeler(Modeler):
             subset=self.data.select(self.predict_col), cumulative=(not self.allow_gaps))
         forecasts = forecasts.to_koalas()
         forecasts.columns = columns
+        forecasts['Index'] = self.data.filter(self.predict_col).select(self.data[self.config["INDIVIDUAL_IDENTIFIER"]]).to_koalas()
+        forecasts = forecasts.set_index('Index')
         # TODO: Add custom index values
         return forecasts
 
@@ -709,8 +711,10 @@ class SurvivalModeler(Modeler):
 
 
 class StateModeler(Modeler):
-    raise NotImplementedError("StateModeler not yet implemented.")
+    def __init__(self):
+        raise NotImplementedError("StateModeler not yet implemented.")
 
 
 class ExitModeler(StateModeler):
-    raise NotImplementedError("ExitModeler not yet implemented.")
+    def __init__(self):
+        raise NotImplementedError("ExitModeler not yet implemented.")
