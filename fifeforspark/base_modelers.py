@@ -175,7 +175,6 @@ class Modeler(ABC):
                 given time horizon.
         """
         findspark.init()
-        self.spark = SparkSession.builder.getOrCreate()
         
         ks.set_option('compute.ops_on_diff_frames', True)
         
@@ -279,7 +278,7 @@ class Modeler(ABC):
 
         Args:
             data: Dataset to train on
-            time_horizon: the number of periods for which you're forecasting (i.e. 2 periods out)
+            time_horizon: the number of periods for which you're forecasting (e.g. 2 periods out)
 
         Returns:
             Spark DataFrame with original dataset subsetted
@@ -291,7 +290,7 @@ class Modeler(ABC):
         Return data with an outcome label for each observation.
 
         Args:
-            time_horizon: the number of periods for which you're forecasting (i.e. 2 periods out)
+            time_horizon: the number of periods for which you're forecasting (e.g. 2 periods out)
 
         Returns:
             Data with outcome label added based on time_horizon
@@ -468,9 +467,7 @@ class SurvivalModeler(Modeler):
             A DataFrame containing, for the binary outcomes of survival to each
             lead length, area under the receiver operating characteristic
             curve (AUROC), predicted and actual shares of observations with an
-            outcome of True, and all elements of the confusion matrix. Also
-            includes concordance index over the restricted mean survival time.
-
+            outcome of True, and all elements of the confusion matrix.
         """
         def compute_metrics_for_binary_outcome_single_node(
                 actuals: Union[pd.Series, pd.DataFrame],
@@ -658,6 +655,8 @@ class SurvivalModeler(Modeler):
             subset=self.data.select(self.predict_col), cumulative=(not self.allow_gaps))
         forecasts = forecasts.to_koalas()
         forecasts.columns = columns
+        forecasts['Index'] = self.data.filter(self.predict_col).select(self.data[self.config["INDIVIDUAL_IDENTIFIER"]]).to_koalas()
+        forecasts = forecasts.set_index('Index')
         # TODO: Add custom index values
         return forecasts
 
@@ -667,7 +666,7 @@ class SurvivalModeler(Modeler):
 
         Args:
             data: Dataset to train on
-            time_horizon: the number of periods for which you're forecasting (i.e. 2 periods out)
+            time_horizon: the number of periods for which you're forecasting (e.g. 2 periods out)
 
         Returns:
             Spark DataFrame with original dataset subsetted
@@ -681,7 +680,7 @@ class SurvivalModeler(Modeler):
         Return data with an outcome label for each observation.
 
         Args:
-            time_horizon: the number of periods for which you're forecasting (i.e. 2 periods out)
+            time_horizon: the number of periods for which you're forecasting (e.g. 2 periods out)
 
         Returns:
             Data with outcome label added based on time_horizon
@@ -691,17 +690,17 @@ class SurvivalModeler(Modeler):
             spark_df[self.duration_col] <= spark_df[self.max_lead_col], spark_df[self.duration_col]).otherwise(spark_df[self.max_lead_col]))
         if self.allow_gaps:
             ids = spark_df[self.config["INDIVIDUAL_IDENTIFIER"],
-                           self.config["time_identifer"]]
+                           self.config["TIME_IDENTIFIER"]]
             ids = ids.withColumn(
                 self.config["INDIVIDUAL_IDENTIFIER"] + '_new', ids[self.config["INDIVIDUAL_IDENTIFIER"]])
             ids = ids.withColumn(
-                self.config["TIME_IDENTIFIER"] + '_new', ids[self.config["time_identifer"]] - time_horizon - 1)
+                self.config["TIME_IDENTIFIER"] + '_new', ids[self.config["TIME_IDENTIFIER"]] - time_horizon - 1)
             ids = ids.withColumn('_label', lit(True))
             ids = ids.drop(
                 self.config["INDIVIDUAL_IDENTIFIER"], self.config["TIME_IDENTIFIER"])
 
-            spark_df = spark_df.join(ids, (spark_df[self.config["INDIVIDUAL_IDENTIFIER"]] == ids[self.config["INDIVIDUAL_IDENTIFIER"]]) & (
-                spark_df[self.config["TIME_IDENTIFIER"]] == ids[self.config["TIME_IDENTIFIER"]]), "left")
+            spark_df = spark_df.join(ids, (spark_df[self.config["INDIVIDUAL_IDENTIFIER"]] == ids[self.config["INDIVIDUAL_IDENTIFIER"] + '_new']) & (
+                spark_df[self.config["TIME_IDENTIFIER"]] == ids[self.config["TIME_IDENTIFIER"] + '_new']), "left")
             spark_df = spark_df.drop(
                 self.config["INDIVIDUAL_IDENTIFIER"] + '_new', self.config["TIME_IDENTIFIER"] + '_new')
             spark_df = spark_df.fillna(False, subset=['_label'])
@@ -712,8 +711,10 @@ class SurvivalModeler(Modeler):
 
 
 class StateModeler(Modeler):
-    pass
+    def __init__(self):
+        raise NotImplementedError("StateModeler not yet implemented.")
 
 
 class ExitModeler(StateModeler):
-    pass
+    def __init__(self):
+        raise NotImplementedError("ExitModeler not yet implemented.")
