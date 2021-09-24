@@ -152,7 +152,7 @@ We can use these ideas to define retention as "living" and attrition as "dying."
 
 ### Censoring
 
-One of the key concepts that survival analysis attempts to address is that of **censoring**. If an individual is present in the last date for which we have data, we don't know if that individual left the data, or if they did, at what point. This individual is *right censored* (left censoring can also happen if the individual entered before our data began, but this does not impact the FIFEforSpark in the same way as right censoring). If we were just to remove all censored individuals, we will create bias because we would only be using the people we've seen leave, therefore not allowing for a person to leave later than our final date. We must, then, assume that the censored individual could still attrite later and mark them as remaining.
+One of the defining concepts of survival analysis is **censoring**. If an individual is present in the last period for which we have data, the individual is *right censored*, as we can't identify when that individual left the dataset. Conversely, an individual is *left censored* if they are present in the first period for which we have data, though that is less of a concern for FIFEforSpark.
 
 ### Survival Function
 
