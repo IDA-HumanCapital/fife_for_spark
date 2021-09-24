@@ -31,7 +31,7 @@ def main():
          in future versions.""")
     pdp_start = time()
     config = parse_config()
-    spark_df = utils.create_example_data2(n_persons = 100, n_periods = 12)
+    spark_df = utils.create_example_data(n_persons = 100, n_periods = 12)
     data_processor = processors.PanelDataProcessor(config, spark_df, shuffle_parts = 20)
     data_processor.build_processed_data()
     data_processor.data.show()

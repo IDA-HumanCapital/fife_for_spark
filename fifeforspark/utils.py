@@ -7,7 +7,7 @@ from pyspark.sql.types import StructType, StructField, StringType, IntegerType, 
 import random as rn
 import argparse
 
-def create_example_data1(n_persons: int = 1000, n_periods: int = 20
+def create_example_data_spark(n_persons: int = 1000, n_periods: int = 20
 ) -> pyspark.sql.DataFrame:
     findspark.init()
     spark = SparkSession.builder.getOrCreate()
@@ -43,7 +43,7 @@ def create_example_data1(n_persons: int = 1000, n_periods: int = 20
     values = values.withColumn('feature_5', values.feature_2)
     return values
 
-def create_example_data2(
+def create_example_data(
     n_persons: int = 8192, n_periods: int = 20, seed_value:int = 9999
 ) -> pyspark.sql.DataFrame:
     """
@@ -58,54 +58,59 @@ def create_example_data2(
         Spark dataframe with example data
 
     """
-    findspark.init()
-    spark = SparkSession.builder.getOrCreate()
-    seed = seed_value
-    np.random.seed(seed)
-    values = []
-    for i in np.arange(n_persons):
-        period = np.random.randint(n_periods) + 1
-        x_1 = np.random.uniform()
-        x_2 = rn.choice(["A", "B", "C"])
-        x_3 = np.random.uniform() + 1.0
-        #Pyspark RDD does not support a column with mutliple dtypes (both string and int)
-        x_4_categories = [1, 2, 3, 'a', 'b', 'c', np.nan]
-        x_4 = rn.choice(x_4_categories)
-        while period <= n_periods:
-            values.append([i, period, x_1, x_2, x_3, x_4])
-            if x_2 == "A":
-                x_1 += np.random.uniform(0, 0.1)
-            else:
-                x_1 += np.random.uniform(0, 0.2)
-            if x_1 > np.sqrt(x_3):
-                break
-            if x_4 in x_4_categories[:-2]:
-                x_4_transition_value = x_4_categories[x_4_categories.index(x_4) + 1]
-                if np.random.uniform() >= 0.75:
-                    x_4 = x_4_transition_value
-                    del x_4_transition_value
-            period += 1
-    values = pd.DataFrame(
-        values,
-        columns=[
-            "individual",
-            "period",
-            "feature_1",
-            "feature_2",
-            "feature_3",
-            "feature_4",
-        ],
-    )
-    values["feature_5"] = values["feature_2"]
-    schema = StructType([
-        StructField('individual', IntegerType(), True),
-        StructField('period', IntegerType(), True),
-        StructField('feature_1', FloatType(), True),
-        StructField('feature_2', StringType(), True),
-        StructField('feature_3', FloatType(), True),
-        StructField('feature_4', StringType(), True),
-        StructField('feature_5', StringType(), True)])
-    return spark.createDataFrame(values, schema = schema)
+    try:
+        findspark.init()
+        spark = SparkSession.builder.getOrCreate()
+        seed = seed_value
+        np.random.seed(seed)
+        values = []
+        for i in np.arange(n_persons):
+            period = np.random.randint(n_periods) + 1
+            x_1 = np.random.uniform()
+            x_2 = rn.choice(["A", "B", "C"])
+            x_3 = np.random.uniform() + 1.0
+            #Pyspark RDD does not support a column with mutliple dtypes (both string and int)
+            x_4_categories = [1, 2, 3, 'a', 'b', 'c', np.nan]
+            x_4 = rn.choice(x_4_categories)
+            while period <= n_periods:
+                values.append([i, period, x_1, x_2, x_3, x_4])
+                if x_2 == "A":
+                    x_1 += np.random.uniform(0, 0.1)
+                else:
+                    x_1 += np.random.uniform(0, 0.2)
+                if x_1 > np.sqrt(x_3):
+                    break
+                if x_4 in x_4_categories[:-2]:
+                    x_4_transition_value = x_4_categories[x_4_categories.index(x_4) + 1]
+                    if np.random.uniform() >= 0.75:
+                        x_4 = x_4_transition_value
+                        del x_4_transition_value
+                period += 1
+        values = pd.DataFrame(
+            values,
+            columns=[
+                "individual",
+                "period",
+                "feature_1",
+                "feature_2",
+                "feature_3",
+                "feature_4",
+            ],
+        )
+        values["feature_5"] = values["feature_2"]
+        schema = StructType([
+            StructField('individual', IntegerType(), True),
+            StructField('period', IntegerType(), True),
+            StructField('feature_1', FloatType(), True),
+            StructField('feature_2', StringType(), True),
+            StructField('feature_3', FloatType(), True),
+            StructField('feature_4', StringType(), True),
+            StructField('feature_5', StringType(), True)])
+        return spark.createDataFrame(values, schema = schema)
+    except MemoryError:
+        raise MemoryError("""Dataset is too large for a pandas dataframes to store at once.
+                          Consider using 'create_example_data_spark' to simulate a dataset
+                          using a pyspark dataframe.""")
 
 def import_data_file(path: str = "Input Data") -> pyspark.sql.DataFrame:
     """ Read data into a distributed spark dataframe.. 
