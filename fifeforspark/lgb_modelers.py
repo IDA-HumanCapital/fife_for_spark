@@ -56,9 +56,7 @@ class LGBModeler(Modeler):
     """
 
     def build_model(
-            self,
-            n_intervals: Union[None, int] = None,
-            params: dict = None
+        self, n_intervals: Union[None, int] = None, params: dict = None
     ) -> None:
         """
         Train and store a sequence of gradient-boosted tree models.
@@ -75,14 +73,12 @@ class LGBModeler(Modeler):
             self.n_intervals = n_intervals
         else:
             self.n_intervals = self.set_n_intervals()
-        self.model = self.train(
-            params=params
-        )
+        self.model = self.train(params=params)
 
     def train(
-            self,
-            params: Union[None, dict] = None,
-            subset: Union[None, pyspark.sql.DataFrame] = None
+        self,
+        params: Union[None, dict] = None,
+        subset: Union[None, pyspark.sql.DataFrame] = None,
     ) -> List[pyspark.ml.pipeline.PipelineModel]:
         """
         Train a LightGBM model for each lead length.
@@ -97,21 +93,21 @@ class LGBModeler(Modeler):
         models = []
         pbar = tqdm(range(self.n_intervals))
         for time_horizon in pbar:
-            pbar.set_description(f"Training models. Currently training model for time horizon {time_horizon}")
+            pbar.set_description(
+                f"Training models. Currently training model for time horizon {time_horizon}"
+            )
             model = self.train_single_model(
-                time_horizon=time_horizon,
-                params=params,
-                subset=subset
+                time_horizon=time_horizon, params=params, subset=subset
             )
             models.append(model)
 
         return models
 
     def train_single_model(
-            self,
-            time_horizon: int,
-            params: Union[None, dict] = None,
-            subset: Union[None, pyspark.sql.DataFrame] = None
+        self,
+        time_horizon: int,
+        params: Union[None, dict] = None,
+        subset: Union[None, pyspark.sql.DataFrame] = None,
     ) -> pyspark.ml.pipeline.PipelineModel:
         """
         Train a LightGBM model for a single lead length.
@@ -133,43 +129,52 @@ class LGBModeler(Modeler):
             }
         elif params.get(time_horizon, None) is None:
             params[time_horizon] = {
-                    "objective": self.objective,
-                    "numIterations": self.config.get("MAX_EPOCHS", 256),
-                }
+                "objective": self.objective,
+                "numIterations": self.config.get("MAX_EPOCHS", 256),
+            }
         if subset is None:
             subset = ~self.data[self.test_col] & ~self.data[self.predict_col]
 
         else:
             self.data = self.data.to_koalas()
-            self.data['subset'] = subset.to_koalas()[list(subset.columns)[0]]
+            self.data["subset"] = subset.to_koalas()[list(subset.columns)[0]]
             self.data = self.data.to_spark()
-            subset = self.data['subset']
-            self.data = self.data.drop('subset')
+            subset = self.data["subset"]
+            self.data = self.data.drop("subset")
 
         data = self.label_data(time_horizon)
         data = data.filter(subset)
         data = self.subset_for_training_horizon(data, time_horizon)
 
         train_data = data.filter(~data[self.validation_col])[
-            self.categorical_features + self.numeric_features + [data['_label']]
-            ] 
-        indexers = [StringIndexer(inputCol=column, outputCol=column + "_index").setHandleInvalid("keep")
-                    for column in self.categorical_features]
-        feature_columns = [column + "_index" for column in self.categorical_features] + self.numeric_features
-        assembler = VectorAssembler(inputCols=feature_columns, outputCol='features').setHandleInvalid("keep")
-        lgb_model = lgb(featuresCol="features",
-                        labelCol="_label",
-                        **params[time_horizon],
-                        weightCol=data.filter(~data[self.validation_col])[self.weight_col]
-                        if self.weight_col
-                        else None
-                        )
+            self.categorical_features + self.numeric_features + [data["_label"]]
+        ]
+        indexers = [
+            StringIndexer(
+                inputCol=column, outputCol=column + "_index"
+            ).setHandleInvalid("keep")
+            for column in self.categorical_features
+        ]
+        feature_columns = [
+            column + "_index" for column in self.categorical_features
+        ] + self.numeric_features
+        assembler = VectorAssembler(
+            inputCols=feature_columns, outputCol="features"
+        ).setHandleInvalid("keep")
+        lgb_model = lgb(
+            featuresCol="features",
+            labelCol="_label",
+            **params[time_horizon],
+            weightCol=data.filter(~data[self.validation_col])[self.weight_col]
+            if self.weight_col
+            else None,
+        )
         pipeline = Pipeline(stages=[*indexers, assembler, lgb_model])
         model = pipeline.fit(train_data)
         return model
 
     def predict(
-            self, subset: Union[None, pyspark.sql.DataFrame] = None, cumulative: bool = True
+        self, subset: Union[None, pyspark.sql.DataFrame] = None, cumulative: bool = True
     ) -> pyspark.sql.DataFrame:
         """Use trained LightGBM models to predict the outcome for each observation and time horizon.
 
@@ -188,22 +193,35 @@ class LGBModeler(Modeler):
         subset = default_subset_to_all(subset, self.data)
 
         self.data = self.data.to_koalas()
-        self.data['subset'] = subset.to_koalas()[list(subset.columns)[0]]
+        self.data["subset"] = subset.to_koalas()[list(subset.columns)[0]]
         self.data = self.data.to_spark()
 
-        predict_data = self.data.filter(self.data['subset'])[self.categorical_features + self.numeric_features]
+        predict_data = self.data.filter(self.data["subset"])[
+            self.categorical_features + self.numeric_features
+        ]
 
         secondelement = udf(lambda v: float(v[1]), FloatType())
         first_model = self.model[0]
-        predictions = first_model.transform(predict_data).selectExpr('probability as probability_1')
-        predictions = predictions.withColumn('probability_1', secondelement(predictions['probability_1']))
+        predictions = first_model.transform(predict_data).selectExpr(
+            "probability as probability_1"
+        )
+        predictions = predictions.withColumn(
+            "probability_1", secondelement(predictions["probability_1"])
+        )
         predictions = predictions.to_koalas()
         for i, lead_specific_model in enumerate(self.model):
             if i != 0:
-                pred_year = lead_specific_model.transform(predict_data).selectExpr(f'probability as probability_{i+1}')
-                predictions[f'probability_{i+1}'] = pred_year.select(secondelement(pred_year[f'probability_{i+1}'])).to_koalas()
+                pred_year = lead_specific_model.transform(predict_data).selectExpr(
+                    f"probability as probability_{i+1}"
+                )
+                predictions[f"probability_{i+1}"] = pred_year.select(
+                    secondelement(pred_year[f"probability_{i+1}"])
+                ).to_koalas()
                 if cumulative:
-                    predictions[f'probability_{i + 1}'] = predictions[f'probability_{i + 1}'] * predictions[f'probability_{i}']
+                    predictions[f"probability_{i + 1}"] = (
+                        predictions[f"probability_{i + 1}"]
+                        * predictions[f"probability_{i}"]
+                    )
         return predictions.to_spark()
 
     def transform_features(self) -> pyspark.sql.DataFrame:
@@ -214,12 +232,14 @@ class LGBModeler(Modeler):
             Spark DataFrame with transformed features
         """
         data = self.data
-        date_cols = [x for x, y in data.dtypes if y in ['date', 'timestamp']]
+        date_cols = [x for x, y in data.dtypes if y in ["date", "timestamp"]]
         for date_col in date_cols:
-            data = data.withColumn(date_col,
-                                   10000*date_format(data[date_col], "y") +
-                                   100*date_format(data[date_col], "M") +
-                                   date_format(data[date_col], "d"))
+            data = data.withColumn(
+                date_col,
+                10000 * date_format(data[date_col], "y")
+                + 100 * date_format(data[date_col], "M")
+                + date_format(data[date_col], "d"),
+            )
         return data
 
     def save_model(self, path: str = "") -> None:
@@ -235,7 +255,7 @@ class LGBModeler(Modeler):
             None
         """
         for i, lead_specific_model in enumerate(self.model):
-            lead_specific_model.write().overwrite().save(f'{path}_model{i}')
+            lead_specific_model.write().overwrite().save(f"{path}_model{i}")
         raise NotImplementedError("Model Saving functionality not yet completed.")
 
 

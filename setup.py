@@ -16,11 +16,11 @@ setup(
     long_description=README,
     long_description_content_type="text/markdown",
     url="https://github.com/IDA-HumanCapital/fife_for_spark",
-    #project_urls={
+    # project_urls={
     #    "Bug Tracker": "https://github.com/IDA-HumanCapital/fife/issues",
     #    "Source Code": "https://github.com/IDA-HumanCapital/fife",
     #    "Documentation": "https://fife.readthedocs.io/en/latest",
-    #},
+    # },
     author="Institute for Defense Analyses",
     author_email="humancapital@ida.org",
     license="AGPLv3+",
@@ -42,9 +42,9 @@ setup(
         "numpy",
         "pandas",
         "databricks",
-        "tqdm"
+        "tqdm",
     ],
-    #extras_require={"shap": ["shap"]},
+    # extras_require={"shap": ["shap"]},
     entry_points={
         "console_scripts": [
             "fifeforspark=fifeforspark.__main__:main",

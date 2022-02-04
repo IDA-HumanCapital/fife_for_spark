@@ -18,5 +18,5 @@ autodoc_mock_imports = [
     "databricks",
     "numpy",
     "fifeforspark.survival_modeler",
-    "typing"
+    "typing",
 ]
