@@ -29,16 +29,21 @@ def default_subset_to_all(
         Original subset argument if not none, otherwise a new boolean mask that is always True.
     """
     if subset is None:
-        return data.withColumn('True_mask', lit(True)).select('True_mask')
+        return data.withColumn("True_mask", lit(True)).select("True_mask")
     else:
-        assert len(subset.columns) == 1, "Provided subset is not a valid one-column subset"
+        assert (
+            len(subset.columns) == 1
+        ), "Provided subset is not a valid one-column subset"
     return subset
 
 
 def compute_metrics_for_binary_outcome(
-    actuals: pyspark.sql.DataFrame, predictions: pyspark.sql.DataFrame, total: int,
-    threshold_positive: Union[None, str, float] = 0.5, share_positive: Union[None, str, float] = None,
-    cache = False
+    actuals: pyspark.sql.DataFrame,
+    predictions: pyspark.sql.DataFrame,
+    total: int,
+    threshold_positive: Union[None, str, float] = 0.5,
+    share_positive: Union[None, str, float] = None,
+    cache=False,
 ) -> OrderedDict:
     """
     Function to compute performance metrics for binary classification models
@@ -55,45 +60,66 @@ def compute_metrics_for_binary_outcome(
     if cache is True:
         predictions.cache()
         actuals.cache()
-    actuals = actuals.select(actuals['actuals'].cast(DoubleType()))
-    num_true = actuals.agg({'actuals': 'sum'}).first()[0]
+    actuals = actuals.select(actuals["actuals"].cast(DoubleType()))
+    num_true = actuals.agg({"actuals": "sum"}).first()[0]
     metrics = OrderedDict()
     if num_true is None:
         num_true = 0
     if (num_true > 0) & (num_true < total):
-        predictions = predictions.withColumn(
-            "row_id", monotonically_increasing_id())
+        predictions = predictions.withColumn("row_id", monotonically_increasing_id())
         actuals = actuals.withColumn("row_id", monotonically_increasing_id())
-        preds_and_labs = predictions.join(actuals, predictions.row_id == actuals.row_id).select(
-            predictions.predictions, actuals.actuals)
+        preds_and_labs = predictions.join(
+            actuals, predictions.row_id == actuals.row_id
+        ).select(predictions.predictions, actuals.actuals)
         if cache is True:
             preds_and_labs.cache()
-        preds_and_labs = preds_and_labs.withColumn('rawPrediction', preds_and_labs.predictions.cast(DoubleType()))
-        evaluator = BinaryClassificationEvaluator(labelCol='actuals')
-        metrics['AUROC'] = evaluator.evaluate(preds_and_labs, {evaluator.metricName: "areaUnderROC"})
-        preds_and_labs = preds_and_labs.drop('rawPrediction')
+        preds_and_labs = preds_and_labs.withColumn(
+            "rawPrediction", preds_and_labs.predictions.cast(DoubleType())
+        )
+        evaluator = BinaryClassificationEvaluator(labelCol="actuals")
+        metrics["AUROC"] = evaluator.evaluate(
+            preds_and_labs, {evaluator.metricName: "areaUnderROC"}
+        )
+        preds_and_labs = preds_and_labs.drop("rawPrediction")
     else:
         metrics["AUROC"] = np.nan
 
     # TODO: Add weighted average functionality
-    mean_predict = predictions.select(mean(col('predictions'))).first()[0]
-    metrics["Actual Share"] = actuals.select(mean(col('actuals'))).first()[0]
+    mean_predict = predictions.select(mean(col("predictions"))).first()[0]
+    metrics["Actual Share"] = actuals.select(mean(col("actuals"))).first()[0]
     metrics["Predicted Share"] = mean_predict
     if actuals.first() is not None:
-        if share_positive == 'predicted':
-            share_positive = predictions.agg(
-                {'predictions': 'mean'}).first()[0]
+        if share_positive == "predicted":
+            share_positive = predictions.agg({"predictions": "mean"}).first()[0]
         if share_positive is not None:
             threshold_positive = predictions.approxQuantile(
-                'predictions', [1-share_positive], relativeError=.1)[0]
-        elif threshold_positive == 'predicted':
+                "predictions", [1 - share_positive], relativeError=0.1
+            )[0]
+        elif threshold_positive == "predicted":
             threshold_positive = mean_predict
-        preds_and_labs = preds_and_labs.withColumn('predictions', when(
-            preds_and_labs.predictions >= threshold_positive, 1).otherwise(0))
-        outcomes = {'True Positives': [1,1], 'False Negatives': [0,1], 'False Positives': [1,0], 'True Negatives': [0,0]}
+        preds_and_labs = preds_and_labs.withColumn(
+            "predictions",
+            when(preds_and_labs.predictions >= threshold_positive, 1).otherwise(0),
+        )
+        outcomes = {
+            "True Positives": [1, 1],
+            "False Negatives": [0, 1],
+            "False Positives": [1, 0],
+            "True Negatives": [0, 0],
+        }
         for key in outcomes.keys():
-            metrics[key] = preds_and_labs.select(((preds_and_labs.predictions == outcomes[key][0]) & (
-                preds_and_labs.actuals == outcomes[key][1])).cast('int').alias('Outcome')).agg({'Outcome': 'sum'}).first()[0]
+            metrics[key] = (
+                preds_and_labs.select(
+                    (
+                        (preds_and_labs.predictions == outcomes[key][0])
+                        & (preds_and_labs.actuals == outcomes[key][1])
+                    )
+                    .cast("int")
+                    .alias("Outcome")
+                )
+                .agg({"Outcome": "sum"})
+                .first()[0]
+            )
     return metrics
 
 
@@ -175,9 +201,9 @@ class Modeler(ABC):
                 given time horizon.
         """
         findspark.init()
-        
-        ks.set_option('compute.ops_on_diff_frames', True)
-        
+
+        ks.set_option("compute.ops_on_diff_frames", True)
+
         if (config.get("TIME_IDENTIFIER", "") == "") and data is not None:
             config["TIME_IDENTIFIER"] = data.columns[1]
 
@@ -212,9 +238,13 @@ class Modeler(ABC):
             self.reserved_cols.append(self.weight_col)
         if self.data is not None:
             self.categorical_features = [
-                col[0] for col in self.data.dtypes if col[1] == 'string']
-            self.numeric_features = [feature for feature in self.data.columns
-                                     if feature not in (self.categorical_features + self.reserved_cols)]
+                col[0] for col in self.data.dtypes if col[1] == "string"
+            ]
+            self.numeric_features = [
+                feature
+                for feature in self.data.columns
+                if feature not in (self.categorical_features + self.reserved_cols)
+            ]
             self.data = self.transform_features()
 
     @abstractmethod
@@ -337,21 +367,32 @@ class Modeler(ABC):
             n_intervals (the maximum periods ahead the model will predict)
         """
         train_durations = self.data.select(
-            (when(
-                self.data[self.duration_col] <= self.data[self.max_lead_col], self.data[self.duration_col]
-            ).otherwise(self.data[self.max_lead_col])).alias('max_durations')
+            (
+                when(
+                    self.data[self.duration_col] <= self.data[self.max_lead_col],
+                    self.data[self.duration_col],
+                ).otherwise(self.data[self.max_lead_col])
+            ).alias("max_durations")
         )
-        subset = ~self.data[self.validation_col] & ~self.data[self.test_col] & ~self.data[self.predict_col]
+        subset = (
+            ~self.data[self.validation_col]
+            & ~self.data[self.test_col]
+            & ~self.data[self.predict_col]
+        )
         train_obs_by_lead_length = train_durations.filter(subset)
         train_obs_by_lead_length = train_obs_by_lead_length.groupBy(
-            'max_durations').count()
+            "max_durations"
+        ).count()
         min_survivors_subset = train_obs_by_lead_length.filter(
-            (train_obs_by_lead_length['count'] > self.config.get(
-                "MIN_SURVIVOR_IN_TRAIN", 64)).alias('max_durations'))
-        assert min_survivors_subset.first() is not None, "No lead length has more than 64 survivors."
-        n_intervals = min_survivors_subset.agg(
-            {'max_durations': 'max'}
-        ).first()[0]
+            (
+                train_obs_by_lead_length["count"]
+                > self.config.get("MIN_SURVIVOR_IN_TRAIN", 64)
+            ).alias("max_durations")
+        )
+        assert (
+            min_survivors_subset.first() is not None
+        ), "No lead length has more than 64 survivors."
+        n_intervals = min_survivors_subset.agg({"max_durations": "max"}).first()[0]
         return n_intervals
 
 
@@ -432,15 +473,20 @@ class SurvivalModeler(Modeler):
             includes concordance index over the restricted mean survival time.
         """
         try:
-            return self._evaluate_single_node(subset=subset,
-                                             threshold_positive=threshold_positive,
-                                             share_positive=share_positive)
+            return self._evaluate_single_node(
+                subset=subset,
+                threshold_positive=threshold_positive,
+                share_positive=share_positive,
+            )
         except MemoryError:
-            return self._evaluate_multi_node(subset=subset,
-                                            threshold_positive=threshold_positive,
-                                            share_positive=share_positive)
+            return self._evaluate_multi_node(
+                subset=subset,
+                threshold_positive=threshold_positive,
+                share_positive=share_positive,
+            )
 
-    def _evaluate_single_node(self,
+    def _evaluate_single_node(
+        self,
         subset: Union[None, pyspark.sql.DataFrame] = None,
         threshold_positive: Union[None, str, float] = 0.5,
         share_positive: Union[None, str, float] = None,
@@ -469,12 +515,13 @@ class SurvivalModeler(Modeler):
             curve (AUROC), predicted and actual shares of observations with an
             outcome of True, and all elements of the confusion matrix.
         """
+
         def compute_metrics_for_binary_outcome_single_node(
-                actuals: Union[pd.Series, pd.DataFrame],
-                predictions: np.ndarray,
-                threshold_positive: Union[None, str, float] = 0.5,
-                share_positive: Union[None, str, float] = None,
-                weights: Union[None, np.ndarray] = None,
+            actuals: Union[pd.Series, pd.DataFrame],
+            predictions: np.ndarray,
+            threshold_positive: Union[None, str, float] = 0.5,
+            share_positive: Union[None, str, float] = None,
+            weights: Union[None, np.ndarray] = None,
         ) -> OrderedDict:
             """Evaluate predicted probabilities against actual binary outcome values.
 
@@ -503,7 +550,9 @@ class SurvivalModeler(Modeler):
             """
             metrics = OrderedDict()
             if actuals.any() and not actuals.all():
-                metrics["AUROC"] = roc_auc_score(actuals, predictions, sample_weight=weights)
+                metrics["AUROC"] = roc_auc_score(
+                    actuals, predictions, sample_weight=weights
+                )
             else:
                 metrics["AUROC"] = np.nan
             metrics["Predicted Share"] = np.average(predictions, weights=weights)
@@ -533,18 +582,24 @@ class SurvivalModeler(Modeler):
                         predictions >= threshold_positive,
                         labels=[True, False],
                         sample_weight=weights,
-                    ).ravel()
-                     .tolist()
+                    )
+                    .ravel()
+                    .tolist()
                 )
             return metrics
 
         if subset is None:
             filtered = self.data.filter(self.data[self.test_col])
-            min_val = filtered.select(self.data[self.period_col]).agg(
-                {self.period_col: 'min'}).first()[0]
-            self.data = self.data.withColumn('subset', self.data[self.test_col] &
-                                                   (self.data[self.period_col] == min_val))
-            subset = self.data.select('subset')
+            min_val = (
+                filtered.select(self.data[self.period_col])
+                .agg({self.period_col: "min"})
+                .first()[0]
+            )
+            self.data = self.data.withColumn(
+                "subset",
+                self.data[self.test_col] & (self.data[self.period_col] == min_val),
+            )
+            subset = self.data.select("subset")
 
         predictions = self.predict(subset=subset, cumulative=(not self.allow_gaps))
 
@@ -553,19 +608,25 @@ class SurvivalModeler(Modeler):
         for lead_length in tqdm(lead_lengths, desc="Evaluating Model by Lead Length"):
             lead_length = int(lead_length)
             labeled_data = self.label_data(int(lead_length - 1))
-            if 'subset' not in labeled_data.columns:
+            if "subset" not in labeled_data.columns:
                 labeled_data = labeled_data.to_koalas()
-                labeled_data['subset'] = subset.to_koalas()[list(subset.columns)[0]]
+                labeled_data["subset"] = subset.to_koalas()[list(subset.columns)[0]]
                 labeled_data = labeled_data.to_spark()
 
-            actuals = labeled_data.filter(labeled_data['subset'])
+            actuals = labeled_data.filter(labeled_data["subset"])
             actuals = actuals.filter(actuals[self.max_lead_col] >= lead_length)
-            weights = actuals.select(self.weight_col).collect() if self.weight_col else None
-            actuals = actuals.select("_label").toPandas()['_label']
+            weights = (
+                actuals.select(self.weight_col).collect() if self.weight_col else None
+            )
+            actuals = actuals.select("_label").toPandas()["_label"]
             metrics.append(
                 compute_metrics_for_binary_outcome_single_node(
                     actuals,
-                    np.array(predictions.select(predictions.columns[lead_length-1]).collect()),
+                    np.array(
+                        predictions.select(
+                            predictions.columns[lead_length - 1]
+                        ).collect()
+                    ),
                     threshold_positive=threshold_positive,
                     share_positive=share_positive,
                     weights=weights,
@@ -576,7 +637,8 @@ class SurvivalModeler(Modeler):
         metrics = metrics.dropna()
         return metrics
 
-    def _evaluate_multi_node(self,
+    def _evaluate_multi_node(
+        self,
         subset: Union[None, pyspark.sql.DataFrame] = None,
         threshold_positive: Union[None, str, float] = 0.5,
         share_positive: Union[None, str, float] = None,
@@ -613,28 +675,35 @@ class SurvivalModeler(Modeler):
         for lead_length in tqdm(lead_lengths, desc="Evaluating Model by Lead Length"):
             actuals = self.label_data(int(lead_length - 1))
             if subset is None:
-                min_val = actuals.select(actuals['_period']).agg({'_period': 'min'}).first()[0]
-                actuals = actuals.withColumn('subset', actuals[self.test_col] &
-                                             (actuals[self.period_col] == min_val))
+                min_val = (
+                    actuals.select(actuals["_period"])
+                    .agg({"_period": "min"})
+                    .first()[0]
+                )
+                actuals = actuals.withColumn(
+                    "subset",
+                    actuals[self.test_col] & (actuals[self.period_col] == min_val),
+                )
             else:
                 actuals = actuals.to_koalas()
-                actuals['subset'] = subset.to_koalas()[list(subset.columns)[0]]
+                actuals["subset"] = subset.to_koalas()[list(subset.columns)[0]]
                 actuals = actuals.to_spark()
 
             actuals = actuals.filter(actuals.subset)
             actuals = actuals.filter(actuals[self.max_lead_col] >= int(lead_length))
-            actuals = actuals.select(actuals["_label"].alias('actuals'))
+            actuals = actuals.select(actuals["_label"].alias("actuals"))
             if lead_length == 1:
                 total = actuals.count()
             metrics.append(
                 compute_metrics_for_binary_outcome(
                     actuals,
                     predictions.select(
-                        predictions[int(lead_length - 1)].alias('predictions')),
+                        predictions[int(lead_length - 1)].alias("predictions")
+                    ),
                     total=total,
                     threshold_positive=threshold_positive,
                     share_positive=share_positive,
-                    cache=self.config.get('CACHE', False)
+                    cache=self.config.get("CACHE", False),
                 )
             )
         metrics = pd.DataFrame(metrics, index=lead_lengths)
@@ -650,17 +719,25 @@ class SurvivalModeler(Modeler):
             Spark DataFrame with forecast results
         """
         columns = [
-            str(i + 1) + "-period Survival Probability" for i in range(self.n_intervals)]
+            str(i + 1) + "-period Survival Probability" for i in range(self.n_intervals)
+        ]
         forecasts = self.predict(
-            subset=self.data.select(self.predict_col), cumulative=(not self.allow_gaps))
+            subset=self.data.select(self.predict_col), cumulative=(not self.allow_gaps)
+        )
         forecasts = forecasts.to_koalas()
         forecasts.columns = columns
-        forecasts['Index'] = self.data.filter(self.predict_col).select(self.data[self.config["INDIVIDUAL_IDENTIFIER"]]).to_koalas()
-        forecasts = forecasts.set_index('Index')
+        forecasts["Index"] = (
+            self.data.filter(self.predict_col)
+            .select(self.data[self.config["INDIVIDUAL_IDENTIFIER"]])
+            .to_koalas()
+        )
+        forecasts = forecasts.set_index("Index")
         # TODO: Add custom index values
         return forecasts
 
-    def subset_for_training_horizon(self, data: pyspark.sql.DataFrame, time_horizon: int) -> pyspark.sql.DataFrame:
+    def subset_for_training_horizon(
+        self, data: pyspark.sql.DataFrame, time_horizon: int
+    ) -> pyspark.sql.DataFrame:
         """
         Return only observations where the outcome is observed.
 
@@ -673,7 +750,9 @@ class SurvivalModeler(Modeler):
         """
         if self.allow_gaps:
             return data.filter(data[self.max_lead_col] > time_horizon)
-        return data.filter((data[self.duration_col] + data[self.event_col].cast('int')) > time_horizon)
+        return data.filter(
+            (data[self.duration_col] + data[self.event_col].cast("int")) > time_horizon
+        )
 
     def label_data(self, time_horizon: int) -> pyspark.sql.DataFrame:
         """
@@ -686,27 +765,51 @@ class SurvivalModeler(Modeler):
             Data with outcome label added based on time_horizon
         """
         spark_df = self.data
-        spark_df = spark_df.withColumn(self.duration_col, when(
-            spark_df[self.duration_col] <= spark_df[self.max_lead_col], spark_df[self.duration_col]).otherwise(spark_df[self.max_lead_col]))
+        spark_df = spark_df.withColumn(
+            self.duration_col,
+            when(
+                spark_df[self.duration_col] <= spark_df[self.max_lead_col],
+                spark_df[self.duration_col],
+            ).otherwise(spark_df[self.max_lead_col]),
+        )
         if self.allow_gaps:
-            ids = spark_df[self.config["INDIVIDUAL_IDENTIFIER"],
-                           self.config["TIME_IDENTIFIER"]]
+            ids = spark_df[
+                self.config["INDIVIDUAL_IDENTIFIER"], self.config["TIME_IDENTIFIER"]
+            ]
             ids = ids.withColumn(
-                self.config["INDIVIDUAL_IDENTIFIER"] + '_new', ids[self.config["INDIVIDUAL_IDENTIFIER"]])
+                self.config["INDIVIDUAL_IDENTIFIER"] + "_new",
+                ids[self.config["INDIVIDUAL_IDENTIFIER"]],
+            )
             ids = ids.withColumn(
-                self.config["TIME_IDENTIFIER"] + '_new', ids[self.config["TIME_IDENTIFIER"]] - time_horizon - 1)
-            ids = ids.withColumn('_label', lit(True))
+                self.config["TIME_IDENTIFIER"] + "_new",
+                ids[self.config["TIME_IDENTIFIER"]] - time_horizon - 1,
+            )
+            ids = ids.withColumn("_label", lit(True))
             ids = ids.drop(
-                self.config["INDIVIDUAL_IDENTIFIER"], self.config["TIME_IDENTIFIER"])
+                self.config["INDIVIDUAL_IDENTIFIER"], self.config["TIME_IDENTIFIER"]
+            )
 
-            spark_df = spark_df.join(ids, (spark_df[self.config["INDIVIDUAL_IDENTIFIER"]] == ids[self.config["INDIVIDUAL_IDENTIFIER"] + '_new']) & (
-                spark_df[self.config["TIME_IDENTIFIER"]] == ids[self.config["TIME_IDENTIFIER"] + '_new']), "left")
+            spark_df = spark_df.join(
+                ids,
+                (
+                    spark_df[self.config["INDIVIDUAL_IDENTIFIER"]]
+                    == ids[self.config["INDIVIDUAL_IDENTIFIER"] + "_new"]
+                )
+                & (
+                    spark_df[self.config["TIME_IDENTIFIER"]]
+                    == ids[self.config["TIME_IDENTIFIER"] + "_new"]
+                ),
+                "left",
+            )
             spark_df = spark_df.drop(
-                self.config["INDIVIDUAL_IDENTIFIER"] + '_new', self.config["TIME_IDENTIFIER"] + '_new')
-            spark_df = spark_df.fillna(False, subset=['_label'])
+                self.config["INDIVIDUAL_IDENTIFIER"] + "_new",
+                self.config["TIME_IDENTIFIER"] + "_new",
+            )
+            spark_df = spark_df.fillna(False, subset=["_label"])
         else:
             spark_df = spark_df.withColumn(
-                '_label', (spark_df[self.duration_col] > lit(time_horizon)).cast('int'))
+                "_label", (spark_df[self.duration_col] > lit(time_horizon)).cast("int")
+            )
         return spark_df
 
 

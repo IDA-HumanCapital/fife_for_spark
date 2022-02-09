@@ -14,13 +14,13 @@ pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --upgr
 rmdir build /s /q
 python setup.py sdist bdist_wheel
 call conda install -y -c conda-forge iniconfig
-@rem pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --upgrade setuptools wheel
-@rem pip install --trusted-host pypi.org hyperopt lifelines pandas pyspark seaborn jupyter jupyter_core ipykernel fife findspark pyarrow koalas databricks sphinx tqdm--user
 
 for /F %%i in ('python setup.py --version') do set version=%%i
-pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --upgrade dist/fifeforspark-%version%-py3-none-any.whl black pytest
+pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --upgrade dist/fifeforspark-%version%-py3-none-any.whl black pytest scikit-learn
 
-echo installed packages correctly!
+pip list --format=freeze > full_requirements.txt
+
+@rem echo installed packages correctly!
 
 black .
 

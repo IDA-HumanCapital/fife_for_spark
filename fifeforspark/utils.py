@@ -3,48 +3,62 @@ import pandas as pd
 import findspark
 import pyspark
 import numpy as np
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, FloatType
+from pyspark.sql.types import (
+    StructType,
+    StructField,
+    StringType,
+    IntegerType,
+    FloatType,
+)
 import random as rn
 import argparse
 
-def create_example_data_spark(n_persons: int = 1000, n_periods: int = 20
+
+def create_example_data_spark(
+    n_persons: int = 1000, n_periods: int = 20
 ) -> pyspark.sql.DataFrame:
     findspark.init()
     spark = SparkSession.builder.getOrCreate()
-    schema = StructType([
-        StructField('individual', IntegerType(), True),
-        StructField('period', IntegerType(), True),
-        StructField('feature_1', FloatType(), True),
-        StructField('feature_2', StringType(), True),
-        StructField('feature_3', IntegerType(), True),
-        StructField('feature_4', StringType(), True)])
+    schema = StructType(
+        [
+            StructField("individual", IntegerType(), True),
+            StructField("period", IntegerType(), True),
+            StructField("feature_1", FloatType(), True),
+            StructField("feature_2", StringType(), True),
+            StructField("feature_3", IntegerType(), True),
+            StructField("feature_4", StringType(), True),
+        ]
+    )
     values = spark.createDataFrame([], schema)
     for i in np.arange(n_persons):
-            period = np.random.randint(n_periods) + 1
-            x_1 = np.random.uniform()
-            x_2 = rn.choice(["A", "B", "C"])
-            x_3 = np.random.uniform() + 1.0
-            x_4_categories = [1, 2, 3, 'a', 'b', 'c', np.nan]
-            x_4 = rn.choice(x_4_categories)
-            while period <= n_periods:
-                values = values.union(spark.createDataFrame([(int(i), period, x_1, x_2, x_3, x_4)]))
-                if x_2 == "A":
-                    x_1 += np.random.uniform(0, 0.1)
-                else:
-                    x_1 += np.random.uniform(0, 0.2)
-                if x_1 > np.sqrt(x_3):
-                    break
-                if x_4 in x_4_categories[:-2]:
-                    x_4_transition_value = x_4_categories[x_4_categories.index(x_4) + 1]
-                    if np.random.uniform() >= 0.75:
-                        x_4 = x_4_transition_value
-                        del x_4_transition_value
-                period += 1
-    values = values.withColumn('feature_5', values.feature_2)
+        period = np.random.randint(n_periods) + 1
+        x_1 = np.random.uniform()
+        x_2 = rn.choice(["A", "B", "C"])
+        x_3 = np.random.uniform() + 1.0
+        x_4_categories = [1, 2, 3, "a", "b", "c", np.nan]
+        x_4 = rn.choice(x_4_categories)
+        while period <= n_periods:
+            values = values.union(
+                spark.createDataFrame([(int(i), period, x_1, x_2, x_3, x_4)])
+            )
+            if x_2 == "A":
+                x_1 += np.random.uniform(0, 0.1)
+            else:
+                x_1 += np.random.uniform(0, 0.2)
+            if x_1 > np.sqrt(x_3):
+                break
+            if x_4 in x_4_categories[:-2]:
+                x_4_transition_value = x_4_categories[x_4_categories.index(x_4) + 1]
+                if np.random.uniform() >= 0.75:
+                    x_4 = x_4_transition_value
+                    del x_4_transition_value
+            period += 1
+    values = values.withColumn("feature_5", values.feature_2)
     return values
 
+
 def create_example_data(
-    n_persons: int = 8192, n_periods: int = 20, seed_value:int = 9999
+    n_persons: int = 8192, n_periods: int = 20, seed_value: int = 9999
 ) -> pyspark.sql.DataFrame:
     """
     Fabricate an unbalanced panel dataset suitable as FIFE input.
@@ -69,8 +83,8 @@ def create_example_data(
             x_1 = np.random.uniform()
             x_2 = rn.choice(["A", "B", "C"])
             x_3 = np.random.uniform() + 1.0
-            #Pyspark RDD does not support a column with mutliple dtypes (both string and int)
-            x_4_categories = [1, 2, 3, 'a', 'b', 'c', np.nan]
+            # Pyspark RDD does not support a column with mutliple dtypes (both string and int)
+            x_4_categories = [1, 2, 3, "a", "b", "c", np.nan]
             x_4 = rn.choice(x_4_categories)
             while period <= n_periods:
                 values.append([i, period, x_1, x_2, x_3, x_4])
@@ -98,41 +112,46 @@ def create_example_data(
             ],
         )
         values["feature_5"] = values["feature_2"]
-        schema = StructType([
-            StructField('individual', IntegerType(), True),
-            StructField('period', IntegerType(), True),
-            StructField('feature_1', FloatType(), True),
-            StructField('feature_2', StringType(), True),
-            StructField('feature_3', FloatType(), True),
-            StructField('feature_4', StringType(), True),
-            StructField('feature_5', StringType(), True)])
-        return spark.createDataFrame(values, schema = schema)
+        schema = StructType(
+            [
+                StructField("individual", IntegerType(), True),
+                StructField("period", IntegerType(), True),
+                StructField("feature_1", FloatType(), True),
+                StructField("feature_2", StringType(), True),
+                StructField("feature_3", FloatType(), True),
+                StructField("feature_4", StringType(), True),
+                StructField("feature_5", StringType(), True),
+            ]
+        )
+        return spark.createDataFrame(values, schema=schema)
     except MemoryError:
-        raise MemoryError("""Dataset is too large for a pandas dataframes to store at once.
+        raise MemoryError(
+            """Dataset is too large for a pandas dataframes to store at once.
                           Consider using 'create_example_data_spark' to simulate a dataset
-                          using a pyspark dataframe.""")
+                          using a pyspark dataframe."""
+        )
+
 
 def import_data_file(path: str = "Input Data") -> pyspark.sql.DataFrame:
-    """ Read data into a distributed spark dataframe.. 
-    """
+    """Read data into a distributed spark dataframe.."""
     findspark.init()
     spark = SparkSession.builder.getOrCreate()
-    
+
     if path is not None:
         if path.endswith(".avro"):
-            data = spark.read.format('avro').load(path)
+            data = spark.read.format("avro").load(path)
         elif path.endswith(".csv"):
-            data = spark.read.format('csv').load(path)
-        elif path.endswith('.txt'):
-            data = spark.read.format('text').load(path)
+            data = spark.read.format("csv").load(path)
+        elif path.endswith(".txt"):
+            data = spark.read.format("text").load(path)
         elif path.endswith(".json"):
-            data = spark.read.format('json').load(path)
+            data = spark.read.format("json").load(path)
         elif path.endswith(".parquet"):
             data = spark.read.load(path)
         else:
-            raise TypeError(
-                "Data file extension is invalid.")
+            raise TypeError("Data file extension is invalid.")
     return data
+
 
 class FIFEArgParser(argparse.ArgumentParser):
     """Argument parser for the FIFE command-line interface."""
