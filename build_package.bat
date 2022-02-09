@@ -16,11 +16,11 @@ python setup.py sdist bdist_wheel
 call conda install -y -c conda-forge iniconfig
 
 for /F %%i in ('python setup.py --version') do set version=%%i
-pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --upgrade dist/fifeforspark-%version%-py3-none-any.whl black pytest
+pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --upgrade dist/fifeforspark-%version%-py3-none-any.whl black pytest scikit-learn
 
-pip freeze > full_requirements.txt
+pip list --format=freeze > full_requirements.txt
 
-echo installed packages correctly!
+@rem echo installed packages correctly!
 
 black .
 
