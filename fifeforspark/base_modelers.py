@@ -4,7 +4,7 @@ from collections import OrderedDict
 
 import pandas as pd
 import numpy as np
-import databricks.koalas as ks
+import pyspark.pandas as ps
 import findspark
 import pyspark.sql
 from pyspark.sql import SparkSession
@@ -202,8 +202,8 @@ class Modeler(ABC):
         """
         findspark.init()
 
-        ks.set_option("compute.ops_on_diff_frames", True)
-
+        #ks.set_option("compute.ops_on_diff_frames", True)
+        ps.config.set_option("compute.ops_on_diff_frames", True)
         if (config.get("TIME_IDENTIFIER", "") == "") and data is not None:
             config["TIME_IDENTIFIER"] = data.columns[1]
 
@@ -609,8 +609,8 @@ class SurvivalModeler(Modeler):
             lead_length = int(lead_length)
             labeled_data = self.label_data(int(lead_length - 1))
             if "subset" not in labeled_data.columns:
-                labeled_data = labeled_data.to_koalas()
-                labeled_data["subset"] = subset.to_koalas()[list(subset.columns)[0]]
+                labeled_data = labeled_data.to_pandas_on_spark()
+                labeled_data["subset"] = subset.to_pandas_on_spark()[list(subset.columns)[0]]
                 labeled_data = labeled_data.to_spark()
 
             actuals = labeled_data.filter(labeled_data["subset"])
@@ -685,8 +685,8 @@ class SurvivalModeler(Modeler):
                     actuals[self.test_col] & (actuals[self.period_col] == min_val),
                 )
             else:
-                actuals = actuals.to_koalas()
-                actuals["subset"] = subset.to_koalas()[list(subset.columns)[0]]
+                actuals = actuals.to_pandas_on_spark()
+                actuals["subset"] = subset.to_pandas_on_spark()[list(subset.columns)[0]]
                 actuals = actuals.to_spark()
 
             actuals = actuals.filter(actuals.subset)
@@ -711,7 +711,7 @@ class SurvivalModeler(Modeler):
         metrics = metrics.dropna()
         return metrics
 
-    def forecast(self) -> ks.DataFrame:
+    def forecast(self) -> ps.DataFrame:
         """
         Tabulate survival probabilities for most recent observations.
 
@@ -724,12 +724,12 @@ class SurvivalModeler(Modeler):
         forecasts = self.predict(
             subset=self.data.select(self.predict_col), cumulative=(not self.allow_gaps)
         )
-        forecasts = forecasts.to_koalas()
+        forecasts = forecasts.to_pandas_on_spark()
         forecasts.columns = columns
+        forecast_data = (self.data.filter(self.predict_col)
+            .select(self.data[self.config["INDIVIDUAL_IDENTIFIER"]]).alias('copy'))
         forecasts["Index"] = (
-            self.data.filter(self.predict_col)
-            .select(self.data[self.config["INDIVIDUAL_IDENTIFIER"]])
-            .to_koalas()
+            forecast_data.to_pandas_on_spark()
         )
         forecasts = forecasts.set_index("Index")
         # TODO: Add custom index values

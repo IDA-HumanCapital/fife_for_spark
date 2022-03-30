@@ -2,6 +2,7 @@
 from typing import Union
 
 import pyspark.sql
+import pyspark.pandas as ps
 from pyspark.ml import Pipeline
 from pyspark.ml.feature import VectorAssembler, StringIndexer
 from fifeforspark.base_modelers import SurvivalModeler
@@ -38,8 +39,8 @@ class GBTModeler(LGBModeler):
             subset = ~self.data[self.test_col] & ~self.data[self.predict_col]
 
         else:
-            self.data = self.data.to_koalas()
-            self.data["subset"] = subset.to_koalas()[list(subset.columns)[0]]
+            self.data = self.data.to_pandas_on_spark()
+            self.data["subset"] = subset.to_pandas_on_spark()[list(subset.columns)[0]]
             self.data = self.data.to_spark()
             subset = self.data["subset"]
             self.data = self.data.drop("subset")

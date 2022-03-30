@@ -2,7 +2,7 @@ import findspark
 import pyspark
 import pyspark.sql
 import pyspark.sql.functions as F
-import databricks.koalas as ks
+import pyspark.pandas as ps
 from pyspark.sql import SparkSession, Window
 from pyspark.sql.functions import isnan, lit, col, lag
 from pyspark.sql.types import (
@@ -54,11 +54,11 @@ class DataProcessor:
             None
         """
         if colname == self.config["TIME_IDENTIFIER"]:
-            ks_df = ks.DataFrame(self.data)
-            ks_df["_period"] = ks_df[self.config["TIME_IDENTIFIER"]].factorize(
+            ps_df = ps.DataFrame(self.data)
+            ps_df["_period"] = ps_df[self.config["TIME_IDENTIFIER"]].factorize(
                 sort=True
             )[0]
-            self.data = ks_df.to_spark()
+            self.data = ps_df.to_spark()
             colname = "_period"
         assert colname in self.data.columns, f"{colname} not in data"
         assert (
@@ -82,11 +82,11 @@ class DataProcessor:
             Boolean value for whether the column is degenerate
         """
         if colname == self.config["TIME_IDENTIFIER"]:
-            ks_df = ks.DataFrame(self.data)
-            ks_df["_period"] = ks_df[self.config["TIME_IDENTIFIER"]].factorize(
+            ps_df = ps.DataFrame(self.data)
+            ps_df["_period"] = ps_df[self.config["TIME_IDENTIFIER"]].factorize(
                 sort=True
             )[0]
-            self.data = ks_df.to_spark()
+            self.data = ps_df.to_spark()
             colname = "_period"
         if self.data.select(isnan(colname).cast("integer").alias(colname)).agg(
             {colname: "mean"}

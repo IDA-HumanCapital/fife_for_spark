@@ -9,6 +9,7 @@ from fifeforspark.lgb_modelers import LGBModeler
 from pyspark.ml.classification import RandomForestClassifier as rfc
 from pyspark.sql.functions import lit
 from warnings import warn
+import pyspark.pandas as ps
 
 
 class RFCModeler(LGBModeler):
@@ -37,8 +38,8 @@ class RFCModeler(LGBModeler):
             subset = ~self.data[self.test_col] & ~self.data[self.predict_col]
 
         else:
-            self.data = self.data.to_koalas()
-            self.data["subset"] = subset.to_koalas()[list(subset.columns)[0]]
+            self.data = self.data.to_pandas_on_spark()
+            self.data["subset"] = subset.to_pandas_on_spark()[list(subset.columns)[0]]
             self.data = self.data.to_spark()
             subset = self.data["subset"]
             self.data = self.data.drop("subset")
