@@ -4,7 +4,6 @@
 
 black==22.1.0
 certifi==2021.10.8
-databricks==0.2
 fifeforspark==0.0.1
 findspark==2.0.0
 ipython==7.31.1

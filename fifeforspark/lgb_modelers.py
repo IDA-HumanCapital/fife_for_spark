@@ -8,13 +8,14 @@ from pyspark.ml.feature import VectorAssembler, StringIndexer
 from pyspark.sql.functions import udf, date_format, col
 from pyspark.sql.types import FloatType
 from fifeforspark.base_modelers import default_subset_to_all, Modeler, SurvivalModeler
-import databricks.koalas as ks
+import pyspark.pandas as ps
 from tqdm import tqdm
 
 from warnings import warn
 
 try:
-    import mmlspark.lightgbm.LightGBMClassifier as lgb
+    # import mmlspark.lightgbm.LightGBMClassifier as lgb
+    import synapse.ml.lightgbm.LightGBMClassifier as lgb
 except ImportError:
     warn("MMLSpark could not be imported. You will not be able to use LGBModeler ")
 
@@ -136,8 +137,8 @@ class LGBModeler(Modeler):
             subset = ~self.data[self.test_col] & ~self.data[self.predict_col]
 
         else:
-            self.data = self.data.to_koalas()
-            self.data["subset"] = subset.to_koalas()[list(subset.columns)[0]]
+            self.data = self.data.to_pandas_on_spark()
+            self.data["subset"] = subset.to_pandas_on_spark()[list(subset.columns)[0]]
             self.data = self.data.to_spark()
             subset = self.data["subset"]
             self.data = self.data.drop("subset")
@@ -192,8 +193,8 @@ class LGBModeler(Modeler):
         """
         subset = default_subset_to_all(subset, self.data)
 
-        self.data = self.data.to_koalas()
-        self.data["subset"] = subset.to_koalas()[list(subset.columns)[0]]
+        self.data = self.data.to_pandas_on_spark()
+        self.data["subset"] = subset.to_pandas_on_spark()[list(subset.columns)[0]]
         self.data = self.data.to_spark()
 
         predict_data = self.data.filter(self.data["subset"])[
@@ -208,7 +209,7 @@ class LGBModeler(Modeler):
         predictions = predictions.withColumn(
             "probability_1", secondelement(predictions["probability_1"])
         )
-        predictions = predictions.to_koalas()
+        predictions = predictions.to_pandas_on_spark()
         for i, lead_specific_model in enumerate(self.model):
             if i != 0:
                 pred_year = lead_specific_model.transform(predict_data).selectExpr(
@@ -216,7 +217,7 @@ class LGBModeler(Modeler):
                 )
                 predictions[f"probability_{i+1}"] = pred_year.select(
                     secondelement(pred_year[f"probability_{i+1}"])
-                ).to_koalas()
+                ).to_pandas_on_spark()
                 if cumulative:
                     predictions[f"probability_{i + 1}"] = (
                         predictions[f"probability_{i + 1}"]
