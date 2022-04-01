@@ -7,7 +7,7 @@ with open("README.md", "r") as f:
 
 setup(
     name="fifeforspark",
-    version="0.0.1",
+    version="0.0.2",
     description=(
         "Finite-Interval Forecasting Engine for Spark: Machine learning models "
         "for discrete-time survival analysis and multivariate time series "
