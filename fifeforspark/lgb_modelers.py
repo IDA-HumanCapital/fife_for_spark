@@ -14,7 +14,7 @@ from tqdm import tqdm
 from warnings import warn
 
 try:
-    #import mmlspark.lightgbm.LightGBMClassifier as lgb
+    # import mmlspark.lightgbm.LightGBMClassifier as lgb
     import synapse.ml.lightgbm.LightGBMClassifier as lgb
 except ImportError:
     warn("MMLSpark could not be imported. You will not be able to use LGBModeler ")

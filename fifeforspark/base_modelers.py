@@ -202,7 +202,7 @@ class Modeler(ABC):
         """
         findspark.init()
 
-        #ks.set_option("compute.ops_on_diff_frames", True)
+        # ks.set_option("compute.ops_on_diff_frames", True)
         ps.config.set_option("compute.ops_on_diff_frames", True)
         if (config.get("TIME_IDENTIFIER", "") == "") and data is not None:
             config["TIME_IDENTIFIER"] = data.columns[1]
@@ -610,7 +610,9 @@ class SurvivalModeler(Modeler):
             labeled_data = self.label_data(int(lead_length - 1))
             if "subset" not in labeled_data.columns:
                 labeled_data = labeled_data.to_pandas_on_spark()
-                labeled_data["subset"] = subset.to_pandas_on_spark()[list(subset.columns)[0]]
+                labeled_data["subset"] = subset.to_pandas_on_spark()[
+                    list(subset.columns)[0]
+                ]
                 labeled_data = labeled_data.to_spark()
 
             actuals = labeled_data.filter(labeled_data["subset"])
@@ -726,11 +728,12 @@ class SurvivalModeler(Modeler):
         )
         forecasts = forecasts.to_pandas_on_spark()
         forecasts.columns = columns
-        forecast_data = (self.data.filter(self.predict_col)
-            .select(self.data[self.config["INDIVIDUAL_IDENTIFIER"]]).alias('copy'))
-        forecasts["Index"] = (
-            forecast_data.to_pandas_on_spark()
+        forecast_data = (
+            self.data.filter(self.predict_col)
+            .select(self.data[self.config["INDIVIDUAL_IDENTIFIER"]])
+            .alias("copy")
         )
+        forecasts["Index"] = forecast_data.to_pandas_on_spark()
         forecasts = forecasts.set_index("Index")
         # TODO: Add custom index values
         return forecasts
