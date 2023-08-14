@@ -28,7 +28,7 @@ Citation
 
 Please cite FIFEforSpark as:
 
-Institute for Defense Analyses. **FIFEforSpark: Finite-Interval Forecasting Engine for Spark [software].** https://github.com/IDA-HumanCapital/fife_for_spark, 2020. Version 0.x.x.
+Institute for Defense Analyses. **FIFEforSpark: Finite-Interval Forecasting Engine for Spark [software].** https://github.com/IDA-HumanCapital/fife_for_spark, 2023. Version 0.x.x.
 
 BibTex:
 
@@ -40,7 +40,7 @@ BibTex:
         title={{FIFE}: {Finite-Interval Forecasting Engine for Spark[software]}},
         howpublished={https://github.com/IDA-HumanCapital/fife_for_spark},
         note={Version 0.x.x},
-        year={2021}
+        year={2023}
     }
 
 Contributing
