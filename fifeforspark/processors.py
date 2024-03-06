@@ -283,9 +283,10 @@ class PanelDataProcessor(DataProcessor):
             "_validation", ~self.data["_test"] & self.data["val_flagged"]
         )
 
-        obs_max_window = Window.partitionBy("_test").orderBy(col("_period").desc())
+        obs_max_window = Window.partitionBy("_test").orderBy(F.desc("_period"))
         self.data = self.data.withColumn(
-            "obs_max_period", F.max(self.data["_period"]).over(obs_max_window)
+            "obs_max_period",
+            F.max(self.data["_period"].cast("int")).over(obs_max_window),
         )
         self.data = self.data.withColumn(
             "_maximum_lead",

@@ -1,4 +1,5 @@
 """FIFE modelers based on Pyspark RFC, which trains gradient-boosted trees."""
+
 from typing import Union
 
 import pyspark.sql

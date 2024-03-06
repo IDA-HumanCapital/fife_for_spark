@@ -1,16 +1,15 @@
 @echo off
 Title F4S Virtual Environment Builder
-echo - This batch file creates and tests a FIFE package.
-echo - You may wish to update the python and FIFE versions in this script.
+echo - This batch file creates and tests a FIFEForSpark package.
+echo - You may wish to update the python and FIFEForSpark versions in this script.
 echo - This file requires an Anaconda (or Miniconda) installation.
 echo - You may need to specify your local path to activate.bat.
 
 setlocal enabledelayedexpansion
-rem call C:/Users/%username%/Miniconda3/Scripts/activate.bat
-call C:/Users/%username%/Anaconda3/Scripts/activate.bat
-call C:/Users/%username%/AppData/Local/Continuum/anaconda3/Scripts/activate.bat
-call conda create -y -n fifeforspark python=3.7
-call C:/Users/%username%/Anaconda3/Scripts/activate.bat fifeforspark
+rem call C:/Users/%username%/AppData/Local/miniconda3/Scripts/activate.bat
+call C:/Users/%username%/AppData/Local/anaconda3/Scripts/activate.bat
+call conda create -y -n fifeforspark python=3.12
+call C:/Users/%username%/AppData/Local/anaconda3/Scripts/activate.bat fifeforspark
 call C:/Users/%username%/AppData/Local/Continuum/anaconda3/Scripts/activate.bat fifeforspark
 pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --upgrade setuptools wheel
 rmdir build /s /q

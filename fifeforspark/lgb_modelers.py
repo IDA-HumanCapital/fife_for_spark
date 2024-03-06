@@ -14,7 +14,6 @@ from tqdm import tqdm
 from warnings import warn
 
 try:
-    # import mmlspark.lightgbm.LightGBMClassifier as lgb
     import synapse.ml.lightgbm.LightGBMClassifier as lgb
 except ImportError:
     warn("MMLSpark could not be imported. You will not be able to use LGBModeler ")
@@ -166,9 +165,11 @@ class LGBModeler(Modeler):
             featuresCol="features",
             labelCol="_label",
             **params[time_horizon],
-            weightCol=data.filter(~data[self.validation_col])[self.weight_col]
-            if self.weight_col
-            else None,
+            weightCol=(
+                data.filter(~data[self.validation_col])[self.weight_col]
+                if self.weight_col
+                else None
+            ),
         )
         pipeline = Pipeline(stages=[*indexers, assembler, lgb_model])
         model = pipeline.fit(train_data)

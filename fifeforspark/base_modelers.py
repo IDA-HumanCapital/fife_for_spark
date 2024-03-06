@@ -645,7 +645,6 @@ class SurvivalModeler(Modeler):
         threshold_positive: Union[None, str, float] = 0.5,
         share_positive: Union[None, str, float] = None,
     ) -> pd.core.frame.DataFrame:
-
         """
         Args:
             subset: A Boolean Series that is True for observations over which
