@@ -7,7 +7,7 @@ with open("README.md", "r") as f:
 
 setup(
     name="fifeforspark",
-    version="0.0.2",
+    version="0.0.3",
     description=(
         "Finite-Interval Forecasting Engine for Spark: Machine learning models "
         "for discrete-time survival analysis and multivariate time series "
@@ -16,11 +16,11 @@ setup(
     long_description=README,
     long_description_content_type="text/markdown",
     url="https://github.com/IDA-HumanCapital/fife_for_spark",
-    # project_urls={
-    #    "Bug Tracker": "https://github.com/IDA-HumanCapital/fife/issues",
-    #    "Source Code": "https://github.com/IDA-HumanCapital/fife",
-    #    "Documentation": "https://fife.readthedocs.io/en/latest",
-    # },
+    project_urls={
+        "Bug Tracker": "https://github.com/IDA-HumanCapital/fife_for_spark/issues",
+        "Source Code": "https://github.com/IDA-HumanCapital/fife_for_spark",
+        "Documentation": "https://fife-for-spark.readthedocs.io/en/latest/",
+    },
     author="Institute for Defense Analyses",
     author_email="humancapital@ida.org",
     license="AGPLv3+",
@@ -43,7 +43,6 @@ setup(
         "pandas",
         "tqdm",
     ],
-    # extras_require={"shap": ["shap"]},
     entry_points={
         "console_scripts": [
             "fifeforspark=fifeforspark.__main__:main",

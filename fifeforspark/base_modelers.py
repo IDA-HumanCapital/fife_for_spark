@@ -29,6 +29,7 @@ def default_subset_to_all(
         Original subset argument if not none, otherwise a new boolean mask that is always True.
     """
     if subset is None:
+        print("subset was none")
         return data.withColumn("True_mask", lit(True)).select("True_mask")
     else:
         assert (
@@ -588,18 +589,12 @@ class SurvivalModeler(Modeler):
                 )
             return metrics
 
-        if subset is None:
-            filtered = self.data.filter(self.data[self.test_col])
-            min_val = (
-                filtered.select(self.data[self.period_col])
-                .agg({self.period_col: "min"})
-                .first()[0]
-            )
+        if (subset is None) | ("subset" not in self.data.columns):
             self.data = self.data.withColumn(
                 "subset",
-                self.data[self.test_col] & (self.data[self.period_col] == min_val),
+                self.data[self.predict_col],
             )
-            subset = self.data.select("subset")
+            subset = self.data["subset"]
 
         predictions = self.predict(subset=subset, cumulative=(not self.allow_gaps))
 
@@ -669,26 +664,34 @@ class SurvivalModeler(Modeler):
             includes concordance index over the restricted mean survival time.
         """
 
+        if (subset is None) | ("subset" not in self.data.columns):
+            self.data = self.data.withColumn(
+                "subset",
+                self.data[self.predict_col],
+            )
+            subset = self.data["subset"]
+
         predictions = self.predict(subset=subset, cumulative=(not self.allow_gaps))
         lead_lengths = np.arange(self.n_intervals) + 1
         metrics = []
         total = -1
         for lead_length in tqdm(lead_lengths, desc="Evaluating Model by Lead Length"):
             actuals = self.label_data(int(lead_length - 1))
-            if subset is None:
-                min_val = (
-                    actuals.select(actuals["_period"])
-                    .agg({"_period": "min"})
-                    .first()[0]
-                )
-                actuals = actuals.withColumn(
-                    "subset",
-                    actuals[self.test_col] & (actuals[self.period_col] == min_val),
-                )
-            else:
-                actuals = actuals.to_pandas_on_spark()
-                actuals["subset"] = subset.to_pandas_on_spark()[list(subset.columns)[0]]
-                actuals = actuals.to_spark()
+            # if subset is None:
+            #     min_val = (
+            #         actuals.select(actuals["_period"])
+            #         .agg({"_period": "min"})
+            #         .first()[0]
+            #     )
+            #     actuals = actuals.withColumn(
+            #         "subset",
+            #         actuals[self.test_col] & (actuals[self.period_col] == min_val),
+            #     )
+
+            # else:
+            #     actuals = actuals.to_pandas_on_spark()
+            #     actuals["subset"] = subset.to_pandas_on_spark()[list(subset.columns)[0]]
+            #     actuals = actuals.to_spark()
 
             actuals = actuals.filter(actuals.subset)
             actuals = actuals.filter(actuals[self.max_lead_col] >= int(lead_length))
@@ -723,7 +726,7 @@ class SurvivalModeler(Modeler):
             str(i + 1) + "-period Survival Probability" for i in range(self.n_intervals)
         ]
         forecasts = self.predict(
-            subset=self.data.select(self.predict_col), cumulative=(not self.allow_gaps)
+            subset=self.data[self.predict_col], cumulative=(not self.allow_gaps)
         )
         forecasts = forecasts.to_pandas_on_spark()
         forecasts.columns = columns

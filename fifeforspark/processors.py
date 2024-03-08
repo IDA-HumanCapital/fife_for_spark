@@ -54,12 +54,14 @@ class DataProcessor:
             None
         """
         if colname == self.config["TIME_IDENTIFIER"]:
-            ps_df = ps.DataFrame(self.data)
-            ps_df["_period"] = ps_df[self.config["TIME_IDENTIFIER"]].factorize(
-                sort=True
-            )[0]
-            self.data = ps_df.to_spark()
+            if "_period" not in self.data.columns:
+                ps_df = ps.DataFrame(self.data)
+                ps_df["_period"] = ps_df[self.config["TIME_IDENTIFIER"]].factorize(
+                    sort=True
+                )[0]
+                self.data = ps_df.to_spark()
             colname = "_period"
+
         assert colname in self.data.columns, f"{colname} not in data"
         assert (
             self.data.select(isnan(colname).cast("int").alias(colname))
@@ -88,7 +90,7 @@ class DataProcessor:
             )[0]
             self.data = ps_df.to_spark()
             colname = "_period"
-        if self.data.select(isnan(colname).cast("integer").alias(colname)).agg(
+        if self.data.select(F.col(colname).isNull().cast("integer").alias(colname)).agg(
             {colname: "mean"}
         ).first()[0] >= self.config.get("MAX_NULL_SHARE", 0.999):
             return True
@@ -258,12 +260,12 @@ class PanelDataProcessor(DataProcessor):
         Returns:
             Spark DataFrame with reserved columns added
         """
+        # ps_df = ps.DataFrame(self.data)
+        # ps_df["_period"] = ps_df[self.config["TIME_IDENTIFIER"]].factorize(sort=True)[0]
+        # self.data = ps_df.to_spark()
+        self.data = self.data.withColumn("_period", self.data._period.cast("int"))
 
         max_val = lit(self.data.agg({"_period": "max"}).first()[0])
-        self.data = self.data.withColumn(
-            "_predict_obs", self.data["_period"] == max_val
-        )
-
         max_test_intervals = int(
             (self.data.select("_period").distinct().count() - 1) / 2
         )
@@ -272,6 +274,11 @@ class PanelDataProcessor(DataProcessor):
                 f"The specified value for TEST_INTERVALS was too high and will not allow for enough training periods. It was automatically reduced to {max_test_intervals}"
             )
             self.config["TEST_INTERVALS"] = max_test_intervals
+
+        self.data = self.data.withColumn(
+            "_predict_obs",
+            (self.data["_period"] + self.config.get("TEST_INTERVALS", 0)) == max_val,
+        )
 
         self.data = self.data.withColumn(
             "_test",
@@ -298,15 +305,13 @@ class PanelDataProcessor(DataProcessor):
         period_window = Window.partitionBy(
             self.config["INDIVIDUAL_IDENTIFIER"]
         ).orderBy("_period")
-        self.data = (
-            self.data.withColumn(
-                "gaps",
-                lag(self.data["_period"]).over(period_window)
-                < (self.data["_period"] - 1),
-            )
-            .fillna(False)
-            .withColumn("gaps", col("gaps").cast("int"))
-        )
+
+        self.data = self.data.withColumn(
+            "gaps",
+            lag(self.data["_period"].cast("int")).over(period_window)
+            < (self.data["_period"].cast("int") - 1),
+        ).fillna(False)
+        self.data = self.data.withColumn("gaps", self.data["gaps"].cast("int"))
 
         self.data = self.data.withColumn(
             "_spell", F.sum(self.data.gaps).over(period_window)
@@ -321,7 +326,8 @@ class PanelDataProcessor(DataProcessor):
 
         max_duration_window = Window.partitionBy(
             [self.config["INDIVIDUAL_IDENTIFIER"], "_spell"]
-        ).orderBy(col("_period").desc())
+        ).orderBy(F.desc("_period"))
+
         self.data = self.data.withColumn(
             "_duration",
             F.max(self.data["_duration"]).over(max_duration_window)
@@ -343,7 +349,6 @@ class PanelDataProcessor(DataProcessor):
         Returns:
             Sorted panel data
         """
-
         return self.data.orderBy(
             F.asc(self.config["INDIVIDUAL_IDENTIFIER"]), F.asc("_period")
         )

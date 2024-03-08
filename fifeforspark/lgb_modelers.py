@@ -194,11 +194,7 @@ class LGBModeler(Modeler):
         """
         subset = default_subset_to_all(subset, self.data)
 
-        self.data = self.data.to_pandas_on_spark()
-        self.data["subset"] = subset.to_pandas_on_spark()[list(subset.columns)[0]]
-        self.data = self.data.to_spark()
-
-        predict_data = self.data.filter(self.data["subset"])[
+        predict_data = self.data.filter(subset)[
             self.categorical_features + self.numeric_features
         ]
 
