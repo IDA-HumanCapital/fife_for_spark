@@ -260,9 +260,6 @@ class PanelDataProcessor(DataProcessor):
         Returns:
             Spark DataFrame with reserved columns added
         """
-        # ps_df = ps.DataFrame(self.data)
-        # ps_df["_period"] = ps_df[self.config["TIME_IDENTIFIER"]].factorize(sort=True)[0]
-        # self.data = ps_df.to_spark()
         self.data = self.data.withColumn("_period", self.data._period.cast("int"))
 
         max_val = lit(self.data.agg({"_period": "max"}).first()[0])

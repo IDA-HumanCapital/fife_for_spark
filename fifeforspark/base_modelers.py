@@ -29,12 +29,7 @@ def default_subset_to_all(
         Original subset argument if not none, otherwise a new boolean mask that is always True.
     """
     if subset is None:
-        print("subset was none")
         return data.withColumn("True_mask", lit(True)).select("True_mask")
-    else:
-        assert (
-            len(subset.columns) == 1
-        ), "Provided subset is not a valid one-column subset"
     return subset
 
 
@@ -203,7 +198,6 @@ class Modeler(ABC):
         """
         findspark.init()
 
-        # ks.set_option("compute.ops_on_diff_frames", True)
         ps.config.set_option("compute.ops_on_diff_frames", True)
         if (config.get("TIME_IDENTIFIER", "") == "") and data is not None:
             config["TIME_IDENTIFIER"] = data.columns[1]
@@ -663,35 +657,21 @@ class SurvivalModeler(Modeler):
             outcome of True, and all elements of the confusion matrix. Also
             includes concordance index over the restricted mean survival time.
         """
-
-        if (subset is None) | ("subset" not in self.data.columns):
-            self.data = self.data.withColumn(
-                "subset",
-                self.data[self.predict_col],
-            )
-            subset = self.data["subset"]
-
         predictions = self.predict(subset=subset, cumulative=(not self.allow_gaps))
         lead_lengths = np.arange(self.n_intervals) + 1
         metrics = []
         total = -1
         for lead_length in tqdm(lead_lengths, desc="Evaluating Model by Lead Length"):
             actuals = self.label_data(int(lead_length - 1))
-            # if subset is None:
-            #     min_val = (
-            #         actuals.select(actuals["_period"])
-            #         .agg({"_period": "min"})
-            #         .first()[0]
-            #     )
-            #     actuals = actuals.withColumn(
-            #         "subset",
-            #         actuals[self.test_col] & (actuals[self.period_col] == min_val),
-            #     )
-
-            # else:
-            #     actuals = actuals.to_pandas_on_spark()
-            #     actuals["subset"] = subset.to_pandas_on_spark()[list(subset.columns)[0]]
-            #     actuals = actuals.to_spark()
+            if (subset is None) | ("subset" not in self.data.columns):
+                actuals = actuals.withColumn(
+                    "subset",
+                    actuals[self.predict_col],
+                )
+            else:
+                actuals = actuals.to_pandas_on_spark()
+                actuals["subset"] = subset.to_pandas_on_spark()[list(subset.columns)[0]]
+                actuals = actuals.to_spark()
 
             actuals = actuals.filter(actuals.subset)
             actuals = actuals.filter(actuals[self.max_lead_col] >= int(lead_length))

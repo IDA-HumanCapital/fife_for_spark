@@ -1,3 +1,10 @@
+## 0.0.3 - 2024-03-14
+
+### Fixed
+- Corrected the subsetting algorithms within BaseModelers
+- Adjusted the computation and typing of select variables created from build_reserve_cols()
+
+
 ## 0.0.2 - 2022-04-01
 
 ### Added
